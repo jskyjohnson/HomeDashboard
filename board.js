@@ -120,33 +120,6 @@ function render(d) {
   // carousel (vault, plan, token history, location)
   hydrateCarousel(d);
 
-  // printer
-  const p = d.printer;
-  if (!p) {
-    $('pr-state').textContent = 'offline';
-    $('pr-body').className = 'muted';
-    $('pr-body').textContent = 'moonraker is not answering, which tracks.';
-  } else {
-    const idle = (p.progress || 0) === 0 && !p.file;
-    if (idle) {
-      $('pr-state').textContent = 'idle';
-      $('pr-body').className = 'muted';
-      $('pr-body').textContent = p.state === 'standby'
-        ? 'unplugged for upgrades. moonraker is up, the printer is not.'
-        : 'connected, nothing printing.';
-      return;
-    }
-    $('pr-state').textContent = p.state;
-    $('pr-body').className = '';
-    $('pr-body').innerHTML = `
-      <div class="bignum">${p.progress ?? 0}<small>percent</small></div>
-      <div class="muted" style="font-size:.75rem">${p.file || 'no job'}</div>
-      <div class="row2">
-        <div><b>${p.hotend ? Math.round(p.hotend) : '—'}&deg;</b><small>hotend</small></div>
-        <div><b>${p.bed ? Math.round(p.bed) : '—'}&deg;</b><small>bed</small></div>
-      </div>`;
-  }
-
   $('az-stamp').textContent = 'updated ' + new Date(d.generated).toLocaleTimeString(undefined,{hour:'2-digit',minute:'2-digit'});
 }
 
@@ -178,7 +151,7 @@ let carouselSlides = [], carouselAt = 0;
 
 async function hydrateCarousel(d) {
   const [plan, loc] = await Promise.all([plan_(), location_()]);
-  renderCarousel({ notes: d.notes || {}, plan, tokens: d.tokens || {}, loc });
+  renderCarousel({ notes: d.notes || {}, plan, tokens: d.tokens || {}, loc, printer: d.printer });
 }
 
 function slideVault(b) {
@@ -221,6 +194,16 @@ function slideTokens(b) {
     <div class="axis"><span>${days[0].d}</span><span>${days[days.length-1].d}</span></div>`;
 }
 
+function slidePrinter(b) {
+  const p = b.printer;
+  if (!p) return '<p class="muted">moonraker is not answering</p>';
+  const busy = (p.progress || 0) > 0 || p.file;
+  return `
+    <h3>the printer</h3>
+    <p class="big">${busy ? (p.file || 'printing') : 'idle'}</p>
+    <p class="muted">${busy ? Math.round(p.progress) + '% done' : 'nothing on the plate'}</p>`;
+}
+
 function slideLocation(b) {
   const l = b.loc || {};
   if (!l.place) return '<p class="muted">no location feed yet<br><span class="tiny">dawarich when it is running</span></p>';
@@ -235,6 +218,7 @@ function renderCarousel(b) {
   if (!el) return;
   carouselSlides = [
     { label: 'vault', sub: 'streak and focus', html: slideVault(b) },
+    { label: 'printer', sub: (b.printer && b.printer.state) || 'offline', html: slidePrinter(b) },
     { label: 'plan', sub: 'one thing at a time', html: slidePlan(b) },
     { label: 'tokens', sub: 'spend', html: slideTokens(b) },
     { label: 'location', sub: 'live', html: slideLocation(b) },
