@@ -213,8 +213,35 @@ function slideLocation(b) {
     <p class="muted">${l.since ? 'since ' + l.since : ''}</p>`;
 }
 
-function renderCarousel(b) {
+function showSlide(i) {
   const el = $('slide'), lab = $('c-label'), sub = $('c-sub'), dots = $('dots');
+  if (!el || !carouselSlides.length) return;
+  carouselAt = ((i % carouselSlides.length) + carouselSlides.length) % carouselSlides.length;
+  const s = carouselSlides[carouselAt];
+  el.classList.add('fade');
+  setTimeout(() => {
+    el.innerHTML = s.html;
+    lab.textContent = s.label;
+    sub.textContent = s.sub || '';
+    if (dots) {
+      dots.innerHTML = carouselSlides.map((_, k) => `<i class="${k === carouselAt ? 'on' : ''}" title="${carouselSlides[k].label}"></i>`).join('');
+      [...dots.children].forEach((dot, k) => {
+        dot.addEventListener('click', () => { showSlide(k); restartCarousel(); });
+      });
+    }
+    el.classList.remove('fade');
+  }, 220);
+}
+
+let carouselTimer = null;
+function restartCarousel() {
+  if (carouselTimer) clearInterval(carouselTimer);
+  carouselTimer = setInterval(() => showSlide(carouselAt + 1), 12000);
+}
+function pauseCarousel() { if (carouselTimer) { clearInterval(carouselTimer); carouselTimer = null; } }
+
+function renderCarousel(b) {
+  const el = $('slide');
   if (!el) return;
   carouselSlides = [
     { label: 'vault', sub: 'streak and focus', html: slideVault(b) },
@@ -223,24 +250,18 @@ function renderCarousel(b) {
     { label: 'tokens', sub: 'spend', html: slideTokens(b) },
     { label: 'location', sub: 'live', html: slideLocation(b) },
   ].filter(s => s.html);
-  const show = (i) => {
-    const s = carouselSlides[i % carouselSlides.length];
-    el.classList.add('fade');
-    setTimeout(() => {
-      el.innerHTML = s.html;
-      lab.textContent = s.label;
-      sub.textContent = s.sub || '';
-      dots.innerHTML = carouselSlides.map((_, k) => `<i class="${k === i % carouselSlides.length ? 'on' : ''}"></i>`).join('');
-      el.classList.remove('fade');
-    }, 260);
-  };
   if (!carouselSlides.length) return;
-  if (!window.__carouselTimer) {
-    show(0);
-    window.__carouselTimer = setInterval(() => { carouselAt = (carouselAt + 1) % carouselSlides.length; show(carouselAt); }, 12000);
-  } else {
-    show(carouselAt);
+
+  // hover to hold, click a dot to jump
+  const panel = el.closest('.carousel');
+  if (panel && !panel.__wired) {
+    panel.__wired = true;
+    panel.addEventListener('mouseenter', pauseCarousel);
+    panel.addEventListener('mouseleave', restartCarousel);
+    el.addEventListener('click', () => showSlide(carouselAt + 1));
   }
+  if (!carouselTimer) restartCarousel();
+  showSlide(carouselAt);
 }
 
 function renderBrief(b) {
