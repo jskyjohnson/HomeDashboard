@@ -103,3 +103,9 @@ ul{margin:0;padding:0;list-style:none}
 #s-net small { display: inline; font-size: .6rem; color: var(--dim); margin-left: 2px; }
 #s-net .sep { color: var(--dim); margin: 0 4px; opacity: .5; }
 #s-hot li b { color: var(--ink); }
+
+/* next events inside the today panel */
+.upnext { margin-top: 12px; border-top: 1px solid rgba(255,255,255,.06); padding-top: 10px; }
+.upnext li { display: flex; gap: 10px; align-items: baseline; padding: 3px 0; font-size: .82rem; }
+.upnext .when { color: var(--gold); font-variant-numeric: tabular-nums; min-width: 86px; font-size: .74rem; letter-spacing: .02em; }
+.upnext .what { color: var(--ink); opacity: .9; overflow: hidden; white-space: nowrap; text-overflow: ellipsis; }

@@ -154,6 +154,34 @@ function render(d) {
   $('az-stamp').textContent = 'updated ' + new Date(d.generated).toLocaleTimeString(undefined,{hour:'2-digit',minute:'2-digit'});
 }
 
+async function calendar_() {
+  try {
+    const r = await fetch('data/calendar.json?t=' + Date.now(), {cache:'no-store'});
+    if (r.ok) return await r.json();
+  } catch (e) {}
+  return null;
+}
+
+function whenLabel(iso) {
+  const d = new Date(iso), now = new Date();
+  const sameDay = d.toDateString() === now.toDateString();
+  const tmrw = new Date(now.getTime() + 86400000).toDateString() === d.toDateString();
+  const time = d.toLocaleTimeString(undefined, {hour:'numeric', minute:'2-digit'});
+  if (sameDay) return 'today ' + time;
+  if (tmrw) return 'tmrw ' + time;
+  return d.toLocaleDateString(undefined, {weekday:'short'}) + ' ' + time;
+}
+
+function renderCalendar(cal) {
+  const el = $('up-next');
+  if (!el) return;
+  const evs = (cal && cal.events) ? cal.events.slice(0, 3) : [];
+  if (!evs.length) { el.innerHTML = ''; return; }
+  el.innerHTML = evs.map(e =>
+    `<li><span class="when">${whenLabel(e.start)}</span><span class="what">${e.summary}</span></li>`
+  ).join('');
+}
+
 async function tokens_() {
   try {
     const r = await fetch('data/tokens.json?t=' + Date.now(), {cache:'no-store'});
@@ -169,6 +197,7 @@ async function pull() {
     const t = await tokens_();
     if (t) d.tokens = t;
     render(d);
+    renderCalendar(await calendar_());
   } catch (e) {
     $('az-line').textContent = 'collector has not run yet';
   }
