@@ -1,0 +1,96 @@
+:root{
+  --bg:#0a0b0e; --panel:#0f1115; --panel2:#12151a;
+  --line:#1c2027; --ink:#e8e4dc; --dim:#8b8578;
+  --gold:#c8a06a; --teal:#5ac8d2; --bad:#d95555; --warn:#d9a13f; --good:#5ec27e;
+}
+*{box-sizing:border-box}
+html,body{margin:0;height:100%}
+body{
+  background:
+    radial-gradient(1100px 520px at 12% -12%, rgba(200,160,106,.10), transparent 60%),
+    radial-gradient(900px 480px at 105% -5%, rgba(90,200,210,.07), transparent 55%),
+    var(--bg);
+  color:var(--ink);
+  font-family:"Inter","Segoe UI",system-ui,sans-serif;
+  -webkit-font-smoothing:antialiased;
+  overflow:hidden;
+}
+#grid{
+  display:grid;
+  grid-template-columns:repeat(12,1fr);
+  grid-auto-rows:min-content;
+  gap:14px;
+  padding:18px 20px 20px;
+  height:100vh;
+}
+.panel{
+  background:linear-gradient(165deg,var(--panel2),var(--panel));
+  border:1px solid var(--line);
+  border-radius:16px;
+  padding:14px 16px;
+  position:relative;
+  overflow:hidden;
+}
+.panel header{display:flex;align-items:baseline;justify-content:space-between;margin-bottom:10px}
+.panel h2{
+  font-size:.68rem;letter-spacing:.2em;text-transform:uppercase;
+  color:var(--dim);font-weight:600;margin:0;
+}
+.panel h2::before{content:"";display:inline-block;width:14px;height:1px;background:var(--gold);opacity:.85;margin-right:8px;vertical-align:middle}
+.panel h3{font-size:.66rem;letter-spacing:.16em;text-transform:uppercase;color:var(--dim);font-weight:600;margin:14px 0 6px}
+.sub{font-size:.72rem;color:var(--dim)}
+small{display:block;font-size:.66rem;color:var(--dim);letter-spacing:.04em;margin-top:2px}
+b{font-variant-numeric:tabular-nums;font-weight:600}
+
+/* ---- today ---- */
+.today{grid-column:span 4;display:flex;flex-direction:column;justify-content:space-between}
+.clock{font-size:4.6rem;line-height:.95;font-weight:600;letter-spacing:-.03em;font-variant-numeric:tabular-nums}
+.date{color:var(--dim);font-size:.95rem;margin-top:6px}
+.wx{display:flex;gap:12px;align-items:baseline;margin-top:14px}
+.wx-temp{font-size:2rem;font-weight:600;font-variant-numeric:tabular-nums}
+.wx-desc{color:var(--dim);font-size:.85rem}
+.verdict{margin-top:10px;font-size:.82rem;letter-spacing:.02em}
+.verdict.good{color:var(--good)} .verdict.no{color:var(--warn)}
+.sunline{color:var(--dim);font-size:.75rem;margin-top:6px}
+
+/* ---- numbers ---- */
+.bignum{font-size:2.6rem;font-weight:600;line-height:1;font-variant-numeric:tabular-nums;margin-bottom:8px}
+.row2{display:flex;gap:18px;margin-top:10px;flex-wrap:wrap}
+.row2>div{min-width:56px}
+.chart{height:64px;margin:6px 0 2px}
+.chart.tall{height:92px}
+.chart svg{width:100%;height:100%;display:block;overflow:visible}
+
+/* ---- panels sizing ---- */
+.traffic{grid-column:span 4}
+.server{grid-column:span 4}
+.tokens{grid-column:span 5}
+.notes{grid-column:span 4}
+.printer{grid-column:span 3}
+.azuna{grid-column:1/-1;display:flex;align-items:center;gap:14px;padding:10px 16px}
+.sig{font-size:.66rem;letter-spacing:.24em;text-transform:uppercase;color:var(--gold)}
+#az-line{font-size:.9rem;color:var(--ink);opacity:.9}
+.stamp{margin-left:auto;font-size:.7rem;color:var(--dim);font-variant-numeric:tabular-nums}
+
+/* ---- meters ---- */
+.meter{display:grid;grid-template-columns:58px 1fr 52px;align-items:center;gap:8px;margin:7px 0}
+.meter label{font-size:.68rem;color:var(--dim);text-transform:uppercase;letter-spacing:.1em}
+.meter span{font-size:.72rem;color:var(--dim);text-align:right;font-variant-numeric:tabular-nums}
+.bar{height:6px;border-radius:99px;background:#171b21;overflow:hidden}
+.bar i{display:block;height:100%;background:linear-gradient(90deg,var(--gold),#e0c08a);border-radius:99px;transition:width .5s ease}
+.bar i.hot{background:linear-gradient(90deg,var(--bad),#e88)}
+
+/* ---- lists ---- */
+ul{margin:0;padding:0;list-style:none}
+.paths li,.down li,.focus li,.recent li{
+  display:flex;justify-content:space-between;gap:10px;
+  font-size:.74rem;color:var(--dim);padding:3px 0;border-bottom:1px solid rgba(255,255,255,.03);
+  overflow:hidden;white-space:nowrap;text-overflow:ellipsis;
+}
+.paths li b,.down li b{color:var(--ink);font-size:.74rem}
+.focus li{border:0;color:var(--ink);opacity:.85;line-height:1.4;display:block;padding:4px 0 4px 14px;position:relative;white-space:normal}
+.focus li::before{content:"";position:absolute;left:0;top:11px;width:5px;height:5px;border-radius:99px;background:var(--gold);opacity:.8}
+.recent li{display:block;white-space:normal;line-height:1.35}
+.streak{font-size:1.8rem;font-weight:600;font-variant-numeric:tabular-nums;margin-bottom:6px}
+.muted{color:var(--dim);font-size:.78rem}
+.warn{color:var(--warn)} .bad{color:var(--bad)}

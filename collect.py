@@ -1,0 +1,275 @@
+#!/usr/bin/env python3
+"""Collects everything the board shows into board.json, next to index.html.
+Runs on the host as sky, every minute, from cron. Read-only except its own output."""
+
+import json, os, re, shutil, sqlite3, subprocess, time, glob
+from datetime import datetime, timezone, timedelta
+
+HOME = os.path.expanduser("~")
+OUT  = os.path.join(HOME, "board", "board.json")
+VAULT = os.path.join(HOME, ".hermes", "Notes")
+DB = os.path.join(HOME, ".hermes", "state.db")
+
+NAP = "%d/%b/%Y:%H:%M:%S"
+
+def parse_dt(raw):
+    """NPM has shipped both nginx-style and ISO timestamps over the years."""
+    if not raw:
+        return None
+    raw = raw.strip()
+    for attempt in (raw.split("+")[0].strip(), raw.replace("Z", ""), raw):
+        try:
+            return datetime.strptime(attempt, NAP)
+        except Exception:
+            pass
+        try:
+            return datetime.fromisoformat(attempt.replace("Z", "+00:00")).replace(tzinfo=None)
+        except Exception:
+            pass
+    return None
+
+def sh(cmd, timeout=8):
+    try:
+        return subprocess.run(cmd, shell=True, capture_output=True, text=True, timeout=timeout).stdout
+    except Exception:
+        return ""
+
+def host():
+    du = shutil.disk_usage("/")
+    mem = {}
+    for line in open("/proc/meminfo"):
+        k, v = line.split(":", 1)
+        mem[k] = int(v.strip().split()[0]) * 1024
+    up = float(open("/proc/uptime").read().split()[0])
+    return {
+        "disk_used": du.used, "disk_total": du.total,
+        "mem_used": mem["MemTotal"] - mem["MemAvailable"], "mem_total": mem["MemTotal"],
+        "load": round(os.getloadavg()[0], 2),
+        "uptime_days": round(up / 86400, 1),
+        "temp_c": host_temp(),
+    }
+
+def host_temp():
+    for p in glob.glob("/sys/class/thermal/thermal_zone*/temp") + glob.glob("/sys/class/hwmon/hwmon*/temp1_input"):
+        try:
+            v = int(open(p).read().strip())
+            if 10000 < v < 120000:
+                return round(v / 1000, 1)
+        except Exception:
+            pass
+    return None
+
+def docker():
+    out = sh("docker ps -a --format '{{.Names}}|{{.State}}'")
+    rows = [r.split("|") for r in out.strip().splitlines() if "|" in r]
+    return {
+        "total": len(rows),
+        "running": sum(1 for r in rows if r[1] == "running"),
+        "down": [r[0] for r in rows if r[1] != "running"],
+    }
+
+def traffic():
+    """Today's requests from every NPM proxy-host access log, plus hourly histogram.
+    NPM writes one log per host (proxy-host-N_access.log) plus fallback logs,
+    there is no single access.log."""
+    logdir = os.path.join(HOME, "nginx", "data", "logs")
+    today = datetime.now().strftime("%d/%b/%Y")
+    hourly = [0] * 24
+    today_n = last_hour = e4 = e5 = 0
+    paths = {}
+    now = datetime.now()
+    files = [f for f in glob.glob(os.path.join(logdir, "*_access.log"))
+             if "letsencrypt" not in os.path.basename(f)]
+    for path in files:
+        try:
+            size = os.path.getsize(path)
+            with open(path, "rb") as f:
+                f.seek(max(0, size - 2_000_000))
+                lines = f.read().decode("utf-8", "replace").splitlines()
+        except Exception:
+            continue
+        for ln in lines:
+            line = ln.strip()
+            if not line:
+                continue
+            dt, status, uri = None, 0, "/"
+            if line.startswith("{"):
+                try:
+                    rec = json.loads(line)
+                    ts = rec.get("time") or rec.get("time_local") or ""
+                    dt = parse_dt(ts)
+                    status = int(rec.get("status") or 0)
+                    uri = rec.get("request_uri") or rec.get("uri") or "/"
+                except Exception:
+                    continue
+            elif line.startswith("["):
+                # NPM's own format:
+                # [08/Nov/2026:02:03:18 +0000] - 502 502 - GET https host "/path" [Client ..] ...
+                try:
+                    stamp = line.split("[", 1)[1].split("]", 1)[0]
+                    dt = parse_dt(stamp.split()[0])
+                    rest = line.split("]", 1)[1].strip().split()
+                    status = int(rest[1]) if len(rest) > 1 and rest[1].isdigit() else 0
+                    q = line.split('"')
+                    uri = q[1] if len(q) > 1 and q[1].startswith("/") else "/"
+                except Exception:
+                    continue
+            else:
+                try:
+                    stamp = line.split("[", 1)[1].split("]", 1)[0]
+                    dt = parse_dt(stamp.split()[0])
+                    quoted = line.split('"')
+                    request = quoted[1] if len(quoted) > 1 else ""
+                    bits = request.split()
+                    uri = bits[1] if len(bits) > 1 else "/"
+                    status = int(quoted[2].split()[0]) if len(quoted) > 2 and quoted[2].split() else 0
+                except Exception:
+                    continue
+            if dt is None:
+                continue
+            if dt.strftime("%d/%b/%Y") == today:
+                today_n += 1
+                hourly[dt.hour] += 1
+                if status >= 500:
+                    e5 += 1
+                elif status >= 400:
+                    e4 += 1
+                key = (uri or "/").split("?")[0][:40]
+                paths[key] = paths.get(key, 0) + 1
+            if (now - dt).total_seconds() < 3600:
+                last_hour += 1
+    top = sorted(paths.items(), key=lambda kv: -kv[1])[:5]
+    return {
+        "today": today_n, "last_hour": last_hour, "e4": e4, "e5": e5,
+        "hourly": hourly,
+        "top": [{"path": k, "n": v} for k, v in top],
+        "sources": len(files),
+    }
+
+def tokens():
+    if not os.path.exists(DB):
+        return None
+    try:
+        con = sqlite3.connect(f"file:{DB}?mode=ro", uri=True)
+    except Exception:
+        return None
+    days = []
+    today = datetime.now().date()
+    for i in range(13, -1, -1):
+        day = today - timedelta(days=i)
+        start = time.mktime(day.timetuple())
+        end = start + 86400
+        row = con.execute(
+            "select coalesce(sum(input_tokens),0), coalesce(sum(output_tokens),0),"
+            " coalesce(sum(api_call_count),0), coalesce(sum(estimated_cost_usd),0)"
+            " from session_model_usage where last_seen >= ? and last_seen < ?",
+            (start, end)).fetchone()
+        days.append({"d": day.strftime("%m-%d"), "in": row[0], "out": row[1],
+                     "calls": row[2], "cost": round(row[3], 4)})
+    t = days[-1]
+    con.close()
+    return {"today_in": t["in"], "today_out": t["out"], "today_calls": t["calls"],
+            "today_cost": t["cost"], "days": days}
+
+def notes():
+    focus, recent = [], []
+    goals = os.path.join(VAULT, "!_Personal", "Goals.md")
+    if os.path.exists(goals):
+        txt = open(goals, encoding="utf-8", errors="replace").read()
+        block = txt.split("## This Quarter")[-1].split("##")[0]
+        focus = [l.strip("- [ ] ").replace("**", "").strip() for l in block.splitlines() if l.strip().startswith("- [ ]")]
+    journals = glob.glob(os.path.join(VAULT, "!_DailyJournal", "*", "*", "*Daily Journal.md"))
+    last = max(journals, key=os.path.getmtime) if journals else None
+    days_since = None
+    if last:
+        days_since = round((time.time() - os.path.getmtime(last)) / 86400, 1)
+    log = os.path.join(VAULT, "!_Hermes", "Log.md")
+    if os.path.exists(log):
+        lines = [l.strip("- ") for l in open(log, encoding="utf-8", errors="replace").read().splitlines() if l.strip().startswith("- ")]
+        recent = lines[:3]
+    return {"focus": focus[:3], "days_since_note": days_since, "recent": recent}
+
+def printer():
+    out = sh("curl -s -m 3 'http://127.0.0.1:7125/printer/objects/query?print_stats&heater_bed&extruder&display_status'")
+    if not out.strip():
+        return None
+    try:
+        st = json.loads(out)["result"]["status"]
+        ps = st.get("print_stats", {})
+        pct = st.get("display_status", {}).get("progress")
+        return {
+            "state": ps.get("state", "?"),
+            "file": (ps.get("filename") or "").split("/")[-1][:40],
+            "progress": round((pct or 0) * 100, 1),
+            "hotend": st.get("extruder", {}).get("temperature"),
+            "bed": st.get("heater_bed", {}).get("temperature"),
+        }
+    except Exception:
+        return None
+
+def safe(fn, default=None):
+    try:
+        return fn()
+    except Exception as e:
+        DIAG.append(f"{fn.__name__}: {type(e).__name__}: {e}")
+        return default
+
+DIAG = []
+
+def diagnostics():
+    log = os.path.join(HOME, "nginx", "data", "logs", "access.log")
+    d = {
+        "home": HOME,
+        "access_logs_found": len(glob.glob(os.path.join(HOME, "nginx", "data", "logs", "*_access.log"))),
+        "access_log": log,
+        "access_log_exists": os.path.exists(log),
+        "logs_dir": sorted(os.listdir(os.path.join(HOME, "nginx", "data", "logs"))) if os.path.isdir(os.path.join(HOME, "nginx", "data", "logs")) else "missing",
+        "state_db": DB,
+        "state_db_exists": os.path.exists(DB),
+        "state_db_readable": os.access(DB, os.R_OK),
+        "vault": VAULT,
+        "vault_exists": os.path.exists(VAULT),
+        "errors": DIAG,
+    }
+    found = [f for f in glob.glob(os.path.join(HOME, "nginx", "data", "logs", "*_access.log"))
+             if "letsencrypt" not in os.path.basename(f)]
+    sized = sorted(((os.path.getsize(f), os.path.basename(f)) for f in found), reverse=True)
+    d["log_sizes"] = [{"file": n, "bytes": b} for b, n in sized[:6]]
+    d["sample_from"] = sized[0][1] if sized else None
+    d["access_log_sample"] = ""
+    if sized and sized[0][0] > 0:
+        try:
+            with open(os.path.join(HOME, "nginx", "data", "logs", sized[0][1]), "r", errors="replace") as f:
+                d["access_log_sample"] = f.readline()[:220]
+        except Exception as e:
+            d["access_log_sample"] = f"unreadable: {e}"
+    # why can't we read the session db?
+    try:
+        st = os.stat(os.path.dirname(DB))
+        d["hermes_dir_mode"] = oct(st.st_mode & 0o777)
+        fst = os.stat(DB)
+        d["state_db_mode"] = oct(fst.st_mode & 0o777)
+    except Exception as e:
+        d["stat_error"] = str(e)
+    try:
+        with open(DB, "rb") as f:
+            f.read(16)
+        d["state_db_open"] = "ok"
+    except Exception as e:
+        d["state_db_open"] = f"{type(e).__name__}: {e}"
+    return d
+
+def main():
+    data = {
+        "generated": datetime.now().isoformat(timespec="seconds"),
+        "host": safe(host, {}), "docker": safe(docker, {}), "traffic": safe(traffic, {}),
+        "tokens": safe(tokens), "notes": safe(notes, {}), "printer": safe(printer),
+        "diag": diagnostics(),
+    }
+    tmp = OUT + ".tmp"
+    with open(tmp, "w") as f:
+        json.dump(data, f)
+    os.replace(tmp, OUT)
+
+if __name__ == "__main__":
+    main()

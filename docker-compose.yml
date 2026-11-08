@@ -1,0 +1,10 @@
+services:
+  board:
+    image: nginx:alpine
+    container_name: board
+    restart: unless-stopped
+    ports:
+      - "3100:80"
+    volumes:
+      - /home/sky/board:/usr/share/nginx/html:ro
+      - /home/sky/.hermes/board-data:/usr/share/nginx/html/data:ro

@@ -1,0 +1,6 @@
+board.json
+board.json.tmp
+data/
+__pycache__/
+*.pyc
+logs/

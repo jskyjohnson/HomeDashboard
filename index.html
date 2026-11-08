@@ -1,0 +1,79 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>azuna board</title>
+<link rel="stylesheet" href="board.css">
+</head>
+<body>
+<div id="grid">
+
+  <section class="panel today" id="p-today">
+    <div class="clock" id="clock">--:--</div>
+    <div class="date" id="date">&nbsp;</div>
+    <div class="wx" id="wx">
+      <span class="wx-temp">&mdash;</span><span class="wx-desc">loading weather</span>
+    </div>
+    <div class="verdict" id="verdict"></div>
+    <div class="sunline" id="sunline"></div>
+  </section>
+
+  <section class="panel traffic" id="p-traffic">
+    <header><h2>traffic</h2><span class="sub" id="t-sub">today</span></header>
+    <div class="bignum"><span id="t-today">0</span><small>requests today</small></div>
+    <div class="chart" id="t-chart"></div>
+    <div class="row2">
+      <div><b id="t-hour">0</b><small>last hour</small></div>
+      <div><b id="t-e4" class="warn">0</b><small>4xx</small></div>
+      <div><b id="t-e5" class="bad">0</b><small>5xx</small></div>
+    </div>
+    <ul class="paths" id="t-paths"></ul>
+  </section>
+
+  <section class="panel server" id="p-server">
+    <header><h2>server</h2><span class="sub" id="s-up"></span></header>
+    <div class="meter"><label>disk</label><div class="bar"><i id="s-disk"></i></div><span id="s-disklbl"></span></div>
+    <div class="meter"><label>memory</label><div class="bar"><i id="s-mem"></i></div><span id="s-memlbl"></span></div>
+    <div class="row2">
+      <div><b id="s-load">0</b><small>load</small></div>
+      <div><b id="s-temp">&mdash;</b><small>cpu &deg;C</small></div>
+      <div><b id="s-docker">0/0</b><small>containers</small></div>
+    </div>
+    <ul class="down" id="s-down"></ul>
+  </section>
+
+  <section class="panel tokens" id="p-tokens">
+    <header><h2>azuna tokens</h2><span class="sub">14 days</span></header>
+    <div class="chart tall" id="k-chart"></div>
+    <div class="row2">
+      <div><b id="k-in">0</b><small>in today</small></div>
+      <div><b id="k-out">0</b><small>out today</small></div>
+      <div><b id="k-cost">$0</b><small>est cost</small></div>
+      <div><b id="k-calls">0</b><small>api calls</small></div>
+    </div>
+  </section>
+
+  <section class="panel notes" id="p-notes">
+    <header><h2>notes</h2><span class="sub" id="n-sub"></span></header>
+    <div class="streak"><b id="n-days">&mdash;</b><small>days since a journal entry</small></div>
+    <ul class="focus" id="n-focus"></ul>
+    <h3>recently, by me</h3>
+    <ul class="recent" id="n-recent"></ul>
+  </section>
+
+  <section class="panel printer" id="p-printer">
+    <header><h2>printer</h2><span class="sub" id="pr-state">&mdash;</span></header>
+    <div id="pr-body" class="muted">checking moonraker</div>
+  </section>
+
+  <section class="panel azuna" id="p-azuna">
+    <span class="sig">azuna</span>
+    <span id="az-line">hello</span>
+    <span class="stamp" id="az-stamp"></span>
+  </section>
+
+</div>
+<script src="board.js"></script>
+</body>
+</html>
