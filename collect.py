@@ -370,11 +370,11 @@ def main():
     data = {
         "generated": datetime.now().isoformat(timespec="seconds"),
         "host": safe(host, {}), "docker": safe(docker, {}), "hot": safe(hot_containers, []), "traffic": safe(traffic, {}),
-        "tokens": safe(tokens), "notes": safe(notes, {}), "printer": safe(printer),
+        "notes": safe(notes, {}), "printer": safe(printer),
         "weather": safe(weather),
         "diag": diagnostics(),
     }
-    tmp = OUT + ".tmp"
+    tmp = f"{OUT}.{os.getpid()}.tmp"
     with open(tmp, "w") as f:
         json.dump(data, f)
     os.replace(tmp, OUT)

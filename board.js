@@ -122,7 +122,7 @@ function render(d) {
     $('k-out').textContent = '—';
     $('k-cost').textContent = '—';
     $('k-calls').textContent = '—';
-    $('k-chart').innerHTML = '<div class="muted">no token data, the state database is not readable from here</div>';
+    $('k-chart').innerHTML = '<div class="muted">no token data yet, the container has not written it</div>';
   }
 
   // carousel (vault, plan, token history, location)
