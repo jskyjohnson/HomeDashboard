@@ -1,3 +1,4 @@
+html{font-size:20px}
 :root{
   --bg:#0a0b0e; --panel:#0f1115; --panel2:#12151a;
   --line:#1c2027; --ink:#e8e4dc; --dim:#8b8578;
@@ -37,9 +38,9 @@ body{
   color:var(--dim);font-weight:600;margin:0;
 }
 .panel h2::before{content:"";display:inline-block;width:14px;height:1px;background:var(--gold);opacity:.85;margin-right:8px;vertical-align:middle}
-.panel h3{font-size:.66rem;letter-spacing:.16em;text-transform:uppercase;color:var(--dim);font-weight:600;margin:14px 0 6px}
-.sub{font-size:.72rem;color:var(--dim)}
-small{display:block;font-size:.66rem;color:var(--dim);letter-spacing:.04em;margin-top:2px}
+.panel h3{font-size:.76rem;letter-spacing:.16em;text-transform:uppercase;color:var(--dim);font-weight:600;margin:14px 0 6px}
+.sub{font-size:.82rem;color:var(--dim)}
+small{display:block;font-size:.76rem;color:var(--dim);letter-spacing:.04em;margin-top:2px}
 b{font-variant-numeric:tabular-nums;font-weight:600}
 
 /* ---- today ---- */
@@ -111,9 +112,25 @@ ul{margin:0;padding:0;list-style:none}
 .upnext .what { color: var(--ink); opacity: .9; overflow: hidden; white-space: nowrap; text-overflow: ellipsis; }
 
 /* morning brief strip */
-.brief { grid-column: 1 / -1; display: flex; gap: 12px; align-items: flex-start; margin: 0 0 18px; padding: 14px 18px;
+.brief { grid-column: 1 / -1; display: flex; gap: 16px; align-items: flex-start; margin: 0 0 16px; padding: 20px 26px;
   background: linear-gradient(90deg, rgba(255,209,102,.07), rgba(255,255,255,.015) 60%, transparent);
   border: 1px solid rgba(255,209,102,.14); border-radius: 14px; }
 .brief .dot { flex: 0 0 auto; width: 7px; height: 7px; border-radius: 50%; background: var(--gold);
   margin-top: 7px; box-shadow: 0 0 10px rgba(255,209,102,.7); }
-.brief p { margin: 0; font-size: .92rem; line-height: 1.45; color: var(--ink); opacity: .93; max-width: 92ch; }
+.brief p { margin: 0; font-size: 1.62rem; line-height: 1.3; color: var(--ink); font-weight: 500; letter-spacing: -.01em; max-width: 46ch; }
+
+/* carousel */
+.carousel{grid-column:span 4;display:flex;flex-direction:column;min-height:0}
+.slide{flex:1;min-height:0;transition:opacity .26s ease}
+.slide.fade{opacity:0}
+.slide .big{font-size:1.5rem;line-height:1.25;margin:2px 0 10px;font-weight:600;color:var(--ink)}
+.slide .streak b{font-size:2.4rem;font-weight:600;font-variant-numeric:tabular-nums}
+.slide .focus li,.slide .recent li{font-size:.95rem;line-height:1.4;padding:3px 0;color:var(--ink);opacity:.9}
+.slide .tinytxt,.slide .tiny{font-size:.72rem;color:var(--dim)}
+.slide .bars{display:flex;align-items:flex-end;gap:4px;height:112px;margin:10px 0 6px}
+.slide .bars i{flex:1;background:linear-gradient(180deg,var(--gold),rgba(200,160,106,.25));border-radius:2px 2px 0 0;opacity:.85}
+.slide .axis{display:flex;justify-content:space-between;font-size:.72rem;color:var(--dim);font-variant-numeric:tabular-nums}
+.dots{display:flex;gap:6px;margin-top:10px}
+.dots i{width:6px;height:6px;border-radius:50%;background:rgba(255,255,255,.16)}
+.dots i.on{background:var(--gold);box-shadow:0 0 8px rgba(200,160,106,.6)}
+.muted{color:var(--dim)}

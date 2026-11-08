@@ -117,12 +117,8 @@ function render(d) {
   $('k-calls').textContent = fmt(k.today_calls || 0);
   $('k-chart').innerHTML = bars(days.map(x => x.in + x.out), 340, 92, '#c8a06a');
 
-  // notes
-  const n = d.notes || {};
-  $('n-days').textContent = n.days_since_note != null ? Math.floor(n.days_since_note) : '—';
-  $('n-sub').textContent = n.days_since_note > 7 ? 'lapsed' : 'current';
-  $('n-focus').innerHTML = (n.focus || []).map(f => `<li>${f}</li>`).join('') || '<li class="muted">no quarter goals set</li>';
-  $('n-recent').innerHTML = (n.recent || []).map(r => `<li>${r}</li>`).join('') || '<li class="muted">nothing logged</li>';
+  // carousel (vault, plan, token history, location)
+  hydrateCarousel(d);
 
   // printer
   const p = d.printer;
@@ -160,6 +156,107 @@ async function brief_() {
     if (r.ok) return await r.json();
   } catch (e) {}
   return null;
+}
+
+async function plan_() {
+  try {
+    const r = await fetch('data/plan.json?t=' + Date.now(), {cache:'no-store'});
+    if (r.ok) return await r.json();
+  } catch (e) {}
+  return null;
+}
+
+async function location_() {
+  try {
+    const r = await fetch('data/location.json?t=' + Date.now(), {cache:'no-store'});
+    if (r.ok) return await r.json();
+  } catch (e) {}
+  return null;
+}
+
+let carouselSlides = [], carouselAt = 0;
+
+async function hydrateCarousel(d) {
+  const [plan, loc] = await Promise.all([plan_(), location_()]);
+  renderCarousel({ notes: d.notes || {}, plan, tokens: d.tokens || {}, loc });
+}
+
+function slideVault(b) {
+  const n = b.notes || {};
+  const days = n.days_since_note != null ? Math.floor(n.days_since_note) : null;
+  const focus = (n.focus || []).map(f => `<li>${f}</li>`).join('');
+  const recent = (n.recent || []).map(r => `<li>${r}</li>`).join('');
+  return `
+    <div class="streak"><b>${days != null ? days : '&mdash;'}</b><small>days since a journal entry</small></div>
+    <ul class="focus">${focus || '<li class="muted">no quarter goals set</li>'}</ul>
+    <h3>recently, by me</h3>
+    <ul class="recent">${recent || '<li class="muted">nothing logged</li>'}</ul>`;
+}
+
+function slidePlan(b) {
+  const p = b.plan || {};
+  if (!p.active) return '<p class="muted" style="font-size:1.05rem">nothing active on the project page</p>';
+  const a = p.active;
+  const tasks = (a.tasks || []).slice(0, 3).map(t => `<li>${t}</li>`).join('');
+  const next = (p.next || []).slice(0, 3).map(t => `<li>${t}</li>`).join('');
+  return `
+    <h3>the one thing</h3>
+    <p class="big">${a.title}</p>
+    <ul class="focus">${tasks || '<li class="muted">no next action written down</li>'}</ul>
+    ${next ? `<h3>then</h3><ul class="recent">${next}</ul>` : ''}`;
+}
+
+function slideTokens(b) {
+  const days = ((b.tokens || {}).days || []).slice(-14);
+  if (!days.length) return '<p class="muted">no token history yet</p>';
+  const max = Math.max(...days.map(d => d.cost || 0), 0.01);
+  const bars = days.map(d => {
+    const hgt = Math.max(2, Math.round(((d.cost || 0) / max) * 100));
+    return `<i style="height:${hgt}%" title="${d.d}: $${(d.cost || 0).toFixed(2)}"></i>`;
+  }).join('');
+  const total = days.reduce((s, d) => s + (d.cost || 0), 0);
+  return `
+    <div class="bignum">$${total.toFixed(2)}<small>last 14 days</small></div>
+    <div class="bars">${bars}</div>
+    <div class="axis"><span>${days[0].d}</span><span>${days[days.length-1].d}</span></div>`;
+}
+
+function slideLocation(b) {
+  const l = b.loc || {};
+  if (!l.place) return '<p class="muted">no location feed yet<br><span class="tiny">dawarich when it is running</span></p>';
+  return `
+    <h3>you are at</h3>
+    <p class="big">${l.place}</p>
+    <p class="muted">${l.since ? 'since ' + l.since : ''}</p>`;
+}
+
+function renderCarousel(b) {
+  const el = $('slide'), lab = $('c-label'), sub = $('c-sub'), dots = $('dots');
+  if (!el) return;
+  carouselSlides = [
+    { label: 'vault', sub: 'streak and focus', html: slideVault(b) },
+    { label: 'plan', sub: 'one thing at a time', html: slidePlan(b) },
+    { label: 'tokens', sub: 'spend', html: slideTokens(b) },
+    { label: 'location', sub: 'live', html: slideLocation(b) },
+  ].filter(s => s.html);
+  const show = (i) => {
+    const s = carouselSlides[i % carouselSlides.length];
+    el.classList.add('fade');
+    setTimeout(() => {
+      el.innerHTML = s.html;
+      lab.textContent = s.label;
+      sub.textContent = s.sub || '';
+      dots.innerHTML = carouselSlides.map((_, k) => `<i class="${k === i % carouselSlides.length ? 'on' : ''}"></i>`).join('');
+      el.classList.remove('fade');
+    }, 260);
+  };
+  if (!carouselSlides.length) return;
+  if (!window.__carouselTimer) {
+    show(0);
+    window.__carouselTimer = setInterval(() => { carouselAt = (carouselAt + 1) % carouselSlides.length; show(carouselAt); }, 12000);
+  } else {
+    show(carouselAt);
+  }
 }
 
 function renderBrief(b) {
