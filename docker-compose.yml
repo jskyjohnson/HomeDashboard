@@ -7,4 +7,6 @@ services:
       - "3100:80"
     volumes:
       - /home/sky/board:/usr/share/nginx/html:ro
-      - /home/sky/.hermes/board-data:/usr/share/nginx/html/data:ro
+      # tokens.json is written by Hermes inside its own container, mounted here read-only
+      - /home/sky/.hermes/board-data:/data:ro
+      - /home/sky/board/nginx-data.conf:/etc/nginx/conf.d/default.conf:ro
