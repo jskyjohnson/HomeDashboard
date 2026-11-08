@@ -189,6 +189,29 @@ def notes():
         recent = lines[:3]
     return {"focus": focus[:3], "days_since_note": days_since, "recent": recent}
 
+def weather():
+    """Open-Meteo, no key. Server-side so a slow CDN can't leave a 'loading' panel."""
+    url = ("https://api.open-meteo.com/v1/forecast?latitude=47.6101&longitude=-122.2015"
+           "&current=temperature_2m,weather_code,wind_speed_10m"
+           "&daily=sunset,precipitation_probability_max"
+           "&temperature_unit=fahrenheit&wind_speed_unit=mph&timezone=auto")
+    raw = sh(f"curl -s -m 8 '{url}'", timeout=12)
+    if not raw.strip():
+        return None
+    try:
+        j = json.loads(raw)
+        cur = j.get("current", {})
+        daily = j.get("daily", {})
+        return {
+            "temp": round(cur.get("temperature_2m", 0)),
+            "wind": round(cur.get("wind_speed_10m", 0)),
+            "code": cur.get("weather_code", 0),
+            "pop": (daily.get("precipitation_probability_max") or [0])[0],
+            "sunset": (daily.get("sunset") or [""])[0],
+        }
+    except Exception:
+        return None
+
 def printer():
     out = sh("curl -s -m 3 'http://127.0.0.1:7125/printer/objects/query?print_stats&heater_bed&extruder&display_status'")
     if not out.strip():
@@ -264,6 +287,7 @@ def main():
         "generated": datetime.now().isoformat(timespec="seconds"),
         "host": safe(host, {}), "docker": safe(docker, {}), "traffic": safe(traffic, {}),
         "tokens": safe(tokens), "notes": safe(notes, {}), "printer": safe(printer),
+        "weather": safe(weather),
         "diag": diagnostics(),
     }
     tmp = OUT + ".tmp"

@@ -42,34 +42,29 @@ function bars(vals, w, h, color) {
     }).join('') + `</svg>`;
 }
 
-async function weather() {
-  try {
-    const u = 'https://api.open-meteo.com/v1/forecast?latitude=47.6101&longitude=-122.2015'
-      + '&current=temperature_2m,weather_code,wind_speed_10m,precipitation'
-      + '&daily=sunset,sunrise,precipitation_probability_max'
-      + '&temperature_unit=fahrenheit&wind_speed_unit=mph&timezone=auto';
-    const r = await fetch(u, {cache:'no-store'});
-    const j = await r.json();
-    const t = Math.round(j.current.temperature_2m);
-    const wind = Math.round(j.current.wind_speed_10m);
-    const pop = j.daily.precipitation_probability_max?.[0] ?? 0;
-    const codes = {0:'clear',1:'mostly clear',2:'partly cloudy',3:'overcast',45:'fog',48:'freezing fog',
-      51:'light drizzle',53:'drizzle',55:'heavy drizzle',61:'light rain',63:'rain',65:'heavy rain',
-      71:'light snow',73:'snow',75:'heavy snow',80:'showers',81:'showers',82:'violent showers',
-      95:'thunderstorm',96:'thunderstorm with hail'};
-    $('wx').innerHTML = `<span class="wx-temp">${t}&deg;</span><span class="wx-desc">${codes[j.current.weather_code]||''} &middot; wind ${wind} mph &middot; rain ${pop}%</span>`;
-    const good = t >= 45 && pop <= 40 && wind <= 22;
-    const v = $('verdict');
-    v.textContent = good ? 'riding weather. go before it changes its mind.' : (pop > 60 ? 'wet. the bike stays in.' : 'marginal. you have ridden worse.');
-    v.className = 'verdict ' + (good ? 'good' : 'no');
-    const set = j.daily.sunset?.[0];
-    if (set) $('sunline').textContent = 'sunset ' + new Date(set).toLocaleTimeString(undefined,{hour:'2-digit',minute:'2-digit'});
-  } catch (e) {
+function weather(d) {
+  const w = d && d.weather;
+  const codes = {0:'clear',1:'mostly clear',2:'partly cloudy',3:'overcast',45:'fog',48:'freezing fog',
+    51:'drizzle',53:'drizzle',55:'heavy drizzle',61:'light rain',63:'rain',65:'heavy rain',
+    71:'light snow',73:'snow',75:'heavy snow',80:'showers',81:'showers',82:'violent showers',
+    95:'thunderstorm',96:'thunderstorm with hail'};
+  if (!w) {
     $('wx').innerHTML = '<span class="wx-desc">weather unavailable</span>';
+    $('verdict').textContent = '';
+    $('sunline').textContent = '';
+    return;
   }
+  $('wx').innerHTML = `<span class="wx-temp">${w.temp}&deg;</span><span class="wx-desc">${codes[w.code]||''} &middot; wind ${w.wind} mph &middot; rain ${w.pop}%</span>`;
+  const good = w.temp >= 45 && w.pop <= 40 && w.wind <= 22;
+  const v = $('verdict');
+  v.textContent = good ? 'riding weather. go before it changes its mind.'
+    : (w.pop > 60 ? 'wet. the bike stays in.' : 'marginal. you have ridden worse.');
+  v.className = 'verdict ' + (good ? 'good' : 'no');
+  if (w.sunset) $('sunline').textContent = 'sunset ' + new Date(w.sunset).toLocaleTimeString(undefined,{hour:'2-digit',minute:'2-digit'});
 }
 
 function render(d) {
+  weather(d);
   // traffic
   const t = d.traffic || {};
   $('t-today').textContent = fmt(t.today || 0);
@@ -165,7 +160,5 @@ async function pull() {
 $('az-line').textContent = LINES[Math.floor(Math.random()*LINES.length)];
 clock();
 setInterval(clock, 1000);
-weather();
 pull();
 setInterval(pull, 30000);
-setInterval(weather, 900000);

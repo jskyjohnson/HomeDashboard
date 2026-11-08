@@ -94,3 +94,7 @@ ul{margin:0;padding:0;list-style:none}
 .streak{font-size:1.8rem;font-weight:600;font-variant-numeric:tabular-nums;margin-bottom:6px}
 .muted{color:var(--dim);font-size:.78rem}
 .warn{color:var(--warn)} .bad{color:var(--bad)}
+
+/* keep the notes panel from growing a scrollbar on long goal text */
+.notes .focus, .notes .recent { max-height: 190px; overflow: hidden; }
+.notes .focus li, .notes .recent li { display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; }
