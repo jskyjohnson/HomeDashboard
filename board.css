@@ -109,3 +109,11 @@ ul{margin:0;padding:0;list-style:none}
 .upnext li { display: flex; gap: 10px; align-items: baseline; padding: 3px 0; font-size: .82rem; }
 .upnext .when { color: var(--gold); font-variant-numeric: tabular-nums; min-width: 86px; font-size: .74rem; letter-spacing: .02em; }
 .upnext .what { color: var(--ink); opacity: .9; overflow: hidden; white-space: nowrap; text-overflow: ellipsis; }
+
+/* morning brief strip */
+.brief { display: flex; gap: 12px; align-items: flex-start; margin: 0 0 18px; padding: 14px 18px;
+  background: linear-gradient(90deg, rgba(255,209,102,.07), rgba(255,255,255,.015) 60%, transparent);
+  border: 1px solid rgba(255,209,102,.14); border-radius: 14px; }
+.brief .dot { flex: 0 0 auto; width: 7px; height: 7px; border-radius: 50%; background: var(--gold);
+  margin-top: 7px; box-shadow: 0 0 10px rgba(255,209,102,.7); }
+.brief p { margin: 0; font-size: .92rem; line-height: 1.45; color: var(--ink); opacity: .93; max-width: 92ch; }

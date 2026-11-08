@@ -154,6 +154,23 @@ function render(d) {
   $('az-stamp').textContent = 'updated ' + new Date(d.generated).toLocaleTimeString(undefined,{hour:'2-digit',minute:'2-digit'});
 }
 
+async function brief_() {
+  try {
+    const r = await fetch('data/brief.json?t=' + Date.now(), {cache:'no-store'});
+    if (r.ok) return await r.json();
+  } catch (e) {}
+  return null;
+}
+
+function renderBrief(b) {
+  const el = $('brief');
+  if (!el) return;
+  const text = b && b.text ? b.text.trim() : '';
+  if (!text) { el.hidden = true; el.innerHTML = ''; return; }
+  el.hidden = false;
+  el.innerHTML = `<span class="dot"></span><p>${text}</p>`;
+}
+
 async function calendar_() {
   try {
     const r = await fetch('data/calendar.json?t=' + Date.now(), {cache:'no-store'});
@@ -198,6 +215,7 @@ async function pull() {
     if (t) d.tokens = t;
     render(d);
     renderCalendar(await calendar_());
+    renderBrief(await brief_());
   } catch (e) {
     $('az-line').textContent = 'collector has not run yet';
   }
