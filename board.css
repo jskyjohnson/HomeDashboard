@@ -111,7 +111,7 @@ ul{margin:0;padding:0;list-style:none}
 .upnext .what { color: var(--ink); opacity: .9; overflow: hidden; white-space: nowrap; text-overflow: ellipsis; }
 
 /* morning brief strip */
-.brief { display: flex; gap: 12px; align-items: flex-start; margin: 0 0 18px; padding: 14px 18px;
+.brief { grid-column: 1 / -1; display: flex; gap: 12px; align-items: flex-start; margin: 0 0 18px; padding: 14px 18px;
   background: linear-gradient(90deg, rgba(255,209,102,.07), rgba(255,255,255,.015) 60%, transparent);
   border: 1px solid rgba(255,209,102,.14); border-radius: 14px; }
 .brief .dot { flex: 0 0 auto; width: 7px; height: 7px; border-radius: 50%; background: var(--gold);
