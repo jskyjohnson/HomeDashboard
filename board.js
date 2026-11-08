@@ -109,13 +109,21 @@ function render(d) {
   $('s-down').innerHTML = (dk.down || []).slice(0, 3).map(n => `<li><span>${n}</span><b class="bad">down</b></li>`).join('');
 
   // tokens
-  const k = d.tokens || {days:[]};
-  const days = k.days || [];
-  $('k-in').textContent = fmt(k.today_in || 0);
-  $('k-out').textContent = fmt(k.today_out || 0);
-  $('k-cost').textContent = '$' + (k.today_cost || 0).toFixed(2);
-  $('k-calls').textContent = fmt(k.today_calls || 0);
-  $('k-chart').innerHTML = bars(days.map(x => x.in + x.out), 340, 92, '#c8a06a');
+  const k = d.tokens;
+  if (k) {
+    const days = k.days || [];
+    $('k-in').textContent = fmt(k.today_in || 0);
+    $('k-out').textContent = fmt(k.today_out || 0);
+    $('k-cost').textContent = '$' + (k.today_cost || 0).toFixed(2);
+    $('k-calls').textContent = fmt(k.today_calls || 0);
+    $('k-chart').innerHTML = bars(days.map(x => x.in + x.out), 340, 92, '#c8a06a');
+  } else {
+    $('k-in').textContent = '—';
+    $('k-out').textContent = '—';
+    $('k-cost').textContent = '—';
+    $('k-calls').textContent = '—';
+    $('k-chart').innerHTML = '<div class="muted">no token data, the state database is not readable from here</div>';
+  }
 
   // carousel (vault, plan, token history, location)
   hydrateCarousel(d);
