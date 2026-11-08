@@ -33,13 +33,17 @@
 
   <section class="panel server" id="p-server">
     <header><h2>server</h2><span class="sub" id="s-up"></span></header>
+    <div class="meter"><label>cpu</label><div class="bar"><i id="s-cpu"></i></div><span id="s-cpulbl">&mdash;</span></div>
+    <div class="meter"><label>mem</label><div class="bar"><i id="s-mem"></i></div><span id="s-memlbl"></span></div>
     <div class="meter"><label>disk</label><div class="bar"><i id="s-disk"></i></div><span id="s-disklbl"></span></div>
-    <div class="meter"><label>memory</label><div class="bar"><i id="s-mem"></i></div><span id="s-memlbl"></span></div>
+    <div class="meter"><label>swap</label><div class="bar"><i id="s-swap"></i></div><span id="s-swaplbl">&mdash;</span></div>
     <div class="row2">
       <div><b id="s-load">0</b><small>load</small></div>
       <div><b id="s-temp">&mdash;</b><small>cpu &deg;C</small></div>
       <div><b id="s-docker">0/0</b><small>containers</small></div>
+      <div><b id="s-net">&mdash;</b><small>net in/out</small></div>
     </div>
+    <ul class="paths" id="s-hot"></ul>
     <ul class="down" id="s-down"></ul>
   </section>
 

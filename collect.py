@@ -34,6 +34,72 @@ def sh(cmd, timeout=8):
     except Exception:
         return ""
 
+STATE = os.path.join(HOME, "board", ".collect-state.json")
+
+def read_state():
+    try:
+        return json.load(open(STATE))
+    except Exception:
+        return {}
+
+def write_state(d):
+    try:
+        json.dump(d, open(STATE, "w"))
+        os.chmod(STATE, 0o644)
+    except Exception:
+        pass
+
+def cpu_usage(prev):
+    """Percent busy since the last sample, from /proc/stat."""
+    try:
+        with open("/proc/stat") as f:
+            parts = f.readline().split()
+        fields = [int(x) for x in parts[1:]]
+        idle = fields[3] + (fields[4] if len(fields) > 4 else 0)
+        total = sum(fields)
+        if prev:
+            dt = total - prev.get("total", total)
+            di = idle - prev.get("idle", idle)
+            pct = 100.0 * (dt - di) / dt if dt > 0 else None
+            return (round(pct, 1) if pct is not None else None), {"total": total, "idle": idle}
+        return None, {"total": total, "idle": idle}
+    except Exception:
+        return None, prev
+
+def net_rate(prev, elapsed):
+    """Bytes per second in and out, summed over every non-loopback interface."""
+    try:
+        rx = tx = 0
+        with open("/proc/net/dev") as f:
+            for line in f.readlines()[2:]:
+                name, data = line.split(":", 1)
+                if name.strip() == "lo":
+                    continue
+                cols = data.split()
+                rx += int(cols[0]); tx += int(cols[8])
+        cur = {"rx": rx, "tx": tx}
+        if prev and elapsed and elapsed > 0:
+            return (max(0, int((rx - prev.get("rx", rx)) / elapsed)),
+                    max(0, int((tx - prev.get("tx", tx)) / elapsed))), cur
+        return (None, None), cur
+    except Exception:
+        return (None, None), prev
+
+def hot_containers():
+    out = sh("docker stats --no-stream --format '{{.Name}}|{{.CPUPerc}}|{{.MemUsage}}' 2>/dev/null", timeout=20)
+    rows = []
+    for line in out.strip().splitlines():
+        parts = line.split("|")
+        if len(parts) != 3:
+            continue
+        try:
+            cpu = float(parts[1].strip().rstrip("%"))
+        except Exception:
+            cpu = 0.0
+        rows.append({"name": parts[0], "cpu": round(cpu, 1), "mem": parts[2].strip()})
+    rows.sort(key=lambda r: -r["cpu"])
+    return rows[:3]
+
 def host():
     du = shutil.disk_usage("/")
     mem = {}
@@ -41,10 +107,28 @@ def host():
         k, v = line.split(":", 1)
         mem[k] = int(v.strip().split()[0]) * 1024
     up = float(open("/proc/uptime").read().split()[0])
+    st = read_state()
+    now = time.time()
+    elapsed = now - st.get("ts", 0) if st.get("ts") else 0
+    cpu_pct, cpu_raw = cpu_usage(st.get("cpu"))
+    (rx, tx), net_raw = net_rate(st.get("net"), elapsed)
+    la = os.getloadavg()
+    procs = []
+    ps = sh("ps -eo comm,%cpu,%mem --sort=-%cpu | head -4").strip().splitlines()[1:]
+    for line in ps:
+        bits = line.split()
+        if len(bits) >= 3:
+            procs.append({"name": bits[0], "cpu": bits[1], "mem": bits[2]})
+    write_state({"ts": now, "cpu": cpu_raw, "net": net_raw})
+    swap_total = mem.get("SwapTotal", 0)
     return {
         "disk_used": du.used, "disk_total": du.total,
         "mem_used": mem["MemTotal"] - mem["MemAvailable"], "mem_total": mem["MemTotal"],
-        "load": round(os.getloadavg()[0], 2),
+        "swap_used": swap_total - mem.get("SwapFree", 0), "swap_total": swap_total,
+        "load": round(la[0], 2), "load5": round(la[1], 2), "load15": round(la[2], 2),
+        "cpu_pct": cpu_pct,
+        "net_in": rx, "net_out": tx,
+        "procs": procs,
         "uptime_days": round(up / 86400, 1),
         "temp_c": host_temp(),
     }
@@ -285,7 +369,7 @@ def diagnostics():
 def main():
     data = {
         "generated": datetime.now().isoformat(timespec="seconds"),
-        "host": safe(host, {}), "docker": safe(docker, {}), "traffic": safe(traffic, {}),
+        "host": safe(host, {}), "docker": safe(docker, {}), "hot": safe(hot_containers, []), "traffic": safe(traffic, {}),
         "tokens": safe(tokens), "notes": safe(notes, {}), "printer": safe(printer),
         "weather": safe(weather),
         "diag": diagnostics(),

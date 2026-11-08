@@ -1,6 +1,7 @@
 // azuna board. no dependencies, one file.
 const $ = (id) => document.getElementById(id);
 const fmt = (n) => n >= 1e9 ? (n/1e9).toFixed(1)+'B' : n >= 1e6 ? (n/1e6).toFixed(1)+'M' : n >= 1e3 ? (n/1e3).toFixed(1)+'k' : String(n);
+const rate = (b) => b >= 1048576 ? (b/1048576).toFixed(1)+'M/s' : b >= 1024 ? (b/1024).toFixed(0)+'k/s' : b+'B/s';
 const bytes = (b) => b >= 1e12 ? (b/1e12).toFixed(1)+'T' : b >= 1e9 ? (b/1e9).toFixed(0)+'G' : (b/1e6).toFixed(0)+'M';
 
 const LINES = [
@@ -76,20 +77,36 @@ function render(d) {
 
   // server
   const h = d.host || {};
-  const dp = h.disk_total ? h.disk_used / h.disk_total * 100 : 0;
-  $('s-disk').style.width = dp.toFixed(1) + '%';
-  $('s-disk').className = dp > 85 ? 'hot' : '';
-  $('s-disklbl').textContent = bytes(h.disk_used) + '/' + bytes(h.disk_total);
-  const mp = h.mem_total ? h.mem_used / h.mem_total * 100 : 0;
-  $('s-mem').style.width = mp.toFixed(1) + '%';
-  $('s-mem').className = mp > 90 ? 'hot' : '';
-  $('s-memlbl').textContent = Math.round(mp) + '%';
+  const pct = (a, b) => (b ? (a / b) * 100 : 0);
+  const bar = (id, label, value, text, hotAt) => {
+    const el = $(id);
+    if (!el) return;
+    el.style.width = Math.min(100, value).toFixed(1) + '%';
+    el.className = value >= hotAt ? 'hot' : '';
+    if (label) $(label).textContent = text;
+  };
+  bar('s-cpu', 's-cpulbl', h.cpu_pct ?? 0, h.cpu_pct != null ? h.cpu_pct + '%' : '—', 85);
+  bar('s-mem', 's-memlbl', pct(h.mem_used, h.mem_total), Math.round(pct(h.mem_used, h.mem_total)) + '%', 90);
+  bar('s-disk', 's-disklbl', pct(h.disk_used, h.disk_total), bytes(h.disk_used) + '/' + bytes(h.disk_total), 85);
+  if (h.swap_total) {
+    bar('s-swap', 's-swaplbl', pct(h.swap_used, h.swap_total), bytes(h.swap_used) + '/' + bytes(h.swap_total), 50);
+  } else {
+    $('s-swap').style.width = '0%';
+    $('s-swaplbl').textContent = 'none';
+  }
   $('s-load').textContent = h.load ?? '-';
   $('s-temp').innerHTML = h.temp_c ? h.temp_c + '&deg;' : '&mdash;';
   $('s-up').textContent = h.uptime_days ? 'up ' + h.uptime_days + 'd' : '';
   const dk = d.docker || {};
-  $('s-docker').textContent = (dk.running||0) + '/' + (dk.total||0);
-  $('s-down').innerHTML = (dk.down||[]).slice(0,3).map(n => `<li><span>${n}</span><b class="bad">down</b></li>`).join('');
+  $('s-docker').textContent = (dk.running || 0) + '/' + (dk.total || 0);
+  $('s-net').innerHTML = (h.net_in != null)
+    ? `${rate(h.net_in)}<small>in</small> <span class="sep">/</span> ${rate(h.net_out)}<small>out</small>`
+    : '&mdash;';
+  const hot = d.hot || [];
+  $('s-hot').innerHTML = hot.length
+    ? hot.map(c => `<li><span>${c.name}</span><b>${c.cpu}% cpu</b></li>`).join('')
+    : '';
+  $('s-down').innerHTML = (dk.down || []).slice(0, 3).map(n => `<li><span>${n}</span><b class="bad">down</b></li>`).join('');
 
   // tokens
   const k = d.tokens || {days:[]};
