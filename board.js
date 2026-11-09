@@ -139,6 +139,32 @@ async function brief_() {
   return null;
 }
 
+async function money_() {
+  try {
+    const r = await fetch('data/money.json?t=' + Date.now(), {cache:'no-store'});
+    if (r.ok) return await r.json();
+  } catch (e) {}
+  return null;
+}
+
+function renderMoney(m) {
+  if (!m) return;
+  const days = m.runway_days != null ? Math.round(m.runway_days) : null;
+  $('m-days').textContent = days != null ? days : '—';
+  $('m-sub').textContent = m.target_date ? 'fund by ' + m.target_date.slice(5).replace('-', '/') : '';
+  const pctv = Math.min(100, m.pct || 0);
+  const bar = $('m-bar');
+  bar.style.width = pctv.toFixed(1) + '%';
+  bar.className = pctv >= 100 ? '' : (m.runway_days < 60 ? 'hot' : '');
+  $('m-lbl').textContent = Math.round(pctv) + '%';
+  const money = (n) => '$' + Math.round(n).toLocaleString();
+  $('m-lines').innerHTML = [
+    `<li><span>in the fund</span><b>${money(m.liquid)} / ${money(m.target)}</b></li>`,
+    `<li><span>gap</span><b>${money(m.gap)}</b></li>`,
+    `<li><span>at ${money(m.surplus)}/mo</span><b>${(m.months_to_goal||0).toFixed(1)} months</b></li>`,
+  ].join('');
+}
+
 async function plan_() {
   try {
     const r = await fetch('data/plan.json?t=' + Date.now(), {cache:'no-store'});
@@ -326,6 +352,7 @@ async function pull() {
     render(d);
     renderCalendar(await calendar_());
     renderBrief(await brief_());
+    renderMoney(await money_());
   } catch (e) {
     $('az-line').textContent = 'collector has not run yet';
   }
