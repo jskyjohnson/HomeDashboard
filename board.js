@@ -181,11 +181,12 @@ async function location_() {
   return null;
 }
 
-let carouselSlides = [], carouselAt = 0;
+let carouselData = null, carouselSlides = [], carouselAt = 0;
 
 async function hydrateCarousel(d) {
   const [plan, loc] = await Promise.all([plan_(), location_()]);
-  renderCarousel({ notes: d.notes || {}, plan, tokens: d.tokens || {}, loc, printer: d.printer });
+  carouselData = { notes: d.notes || {}, plan, tokens: d.tokens || {}, loc, printer: d.printer };
+  renderCarousel(carouselData);
 }
 
 function slideVault(b) {
@@ -241,10 +242,33 @@ function slidePrinter(b) {
 function slideLocation(b) {
   const l = b.loc || {};
   if (!l.place) return '<p class="muted">no location feed yet<br><span class="tiny">dawarich when it is running</span></p>';
+  const hasTrack = (l.today_track || []).length > 1;
   return `
     <h3>you are at</h3>
     <p class="big">${l.place}</p>
-    <p class="muted">${l.since ? 'since ' + l.since : ''}</p>`;
+    <p class="muted">${l.since ? 'since ' + l.since : ''}</p>
+    ${hasTrack ? '<div id="mini-map"></div>' : ''}`;
+}
+
+function drawMiniMap(l) {
+  const el = document.getElementById('mini-map');
+  if (!el || !window.L || !l || !(l.today_track || []).length) return;
+  if (window.__miniMap) { window.__miniMap.remove(); window.__miniMap = null; }
+  const track = l.today_track;
+  const map = L.map(el, {
+    zoomControl: false, attributionControl: false, dragging: false,
+    scrollWheelZoom: false, doubleClickZoom: false, boxZoom: false, keyboard: false,
+  });
+  L.tileLayer('https://tile.openstreetmap.org/{z}/{x}/{y}.png', {
+    maxZoom: 19, attribution: '&copy; OpenStreetMap',
+  }).addTo(map);
+  const line = L.polyline(track, { color: '#c8a06a', weight: 3, opacity: 0.85 }).addTo(map);
+  const last = track[track.length - 1];
+  L.circleMarker(last, { radius: 6, color: '#c8a06a', weight: 2, fillColor: '#f0dcb8', fillOpacity: 0.9 }).addTo(map);
+  L.circleMarker(track[0], { radius: 3, color: '#5ac8d2', weight: 1, fillColor: '#5ac8d2', fillOpacity: 0.7 }).addTo(map);
+  try { map.fitBounds(line.getBounds(), { padding: [14, 14] }); } catch (e) {}
+  window.__miniMap = map;
+  setTimeout(() => map.invalidateSize(), 150);
 }
 
 function showSlide(i) {
@@ -263,6 +287,7 @@ function showSlide(i) {
         dot.addEventListener('click', () => { showSlide(k); restartCarousel(); });
       });
     }
+    if (s.label === 'location' && carouselData) drawMiniMap(carouselData.loc);
     el.classList.remove('fade');
   }, 220);
 }
