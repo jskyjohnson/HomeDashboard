@@ -142,22 +142,12 @@ function weather(d) {
 
 function render(d) {
   weather(d);
-  // traffic
   const t = d.traffic || {};
-  $('t-today').textContent = fmt(t.today || 0);
-  $('t-hour').textContent = fmt(t.last_hour || 0);
-  $('t-e4').textContent = fmt(t.e4 || 0);
-  $('t-e5').textContent = fmt(t.e5 || 0);
-  // hourly[] are the server's local hours, and the server runs UTC, so the
-  // window has to be picked with the Pacific hour too, not the browser's.
-  const ph = Number(new Intl.DateTimeFormat('en-US', tzOpts({ hour: '2-digit', hour12: false })).format(new Date())) % 24;
-  $('t-chart').innerHTML = spark((t.hourly || []).slice(Math.max(0, ph - 11), ph + 1), 300, 64, '#5ac8d2', true);
-
-  $('t-paths').innerHTML = (t.top || []).map(p => `<li><span>${p.path}</span><b>${fmt(p.n)}</b></li>`).join('') || '<li class="muted">no hits yet today</li>';
-
-  // server
   const h = d.host || {};
+  const dk = d.docker || {};
   const pct = (a, b) => (b ? (a / b) * 100 : 0);
+
+  // ---- server and traffic, one card ----
   const bar = (id, label, value, text, hotAt) => {
     const el = $(id);
     if (!el) return;
@@ -168,45 +158,40 @@ function render(d) {
   bar('s-cpu', 's-cpulbl', h.cpu_pct ?? 0, h.cpu_pct != null ? h.cpu_pct + '%' : '—', 85);
   bar('s-mem', 's-memlbl', pct(h.mem_used, h.mem_total), Math.round(pct(h.mem_used, h.mem_total)) + '%', 90);
   bar('s-disk', 's-disklbl', pct(h.disk_used, h.disk_total), bytes(h.disk_used) + '/' + bytes(h.disk_total), 85);
-  if (h.swap_total) {
-    bar('s-swap', 's-swaplbl', pct(h.swap_used, h.swap_total), bytes(h.swap_used) + '/' + bytes(h.swap_total), 50);
-  } else {
-    $('s-swap').style.width = '0%';
-    $('s-swaplbl').textContent = 'none';
-  }
-  $('s-load').textContent = h.load ?? '-';
-  $('s-temp').innerHTML = h.temp_c ? h.temp_c + '&deg;' : '&mdash;';
-  $('s-up').textContent = h.uptime_days ? 'up ' + h.uptime_days + 'd' : '';
-  const dk = d.docker || {};
-  $('s-docker').textContent = (dk.running || 0) + '/' + (dk.total || 0);
-  $('s-net').innerHTML = (h.net_in != null)
-    ? `${rate(h.net_in)}<small>in</small> <span class="sep">/</span> ${rate(h.net_out)}<small>out</small>`
-    : '&mdash;';
-  const hot = d.hot || [];
-  $('s-hot').innerHTML = hot.length
-    ? hot.map(c => `<li><span>${c.name}</span><b>${c.cpu}% cpu</b></li>`).join('')
-    : '';
-  $('s-down').innerHTML = (dk.down || []).slice(0, 3).map(n => `<li><span>${n}</span><b class="bad">down</b></li>`).join('');
 
-  // tokens
+  $('s-docker').textContent = (dk.running || 0) + '/' + (dk.total || 0);
+  $('s-temp').innerHTML = h.temp_c ? h.temp_c + '&deg;' : '&mdash;';
+  $('t-today').textContent = fmt(t.today || 0);
+  $('t-e5').textContent = fmt(t.e5 || 0);
+  $('l-up').textContent = h.uptime_days ? 'up ' + h.uptime_days + 'd' : '';
+
+  // hourly[] are the server's local hours, and the server runs UTC, so the
+  // window has to be picked with the Pacific hour too, not the browser's.
+  const ph = Number(new Intl.DateTimeFormat('en-US', tzOpts({ hour: '2-digit', hour12: false })).format(new Date())) % 24;
+  $('t-chart').innerHTML = spark((t.hourly || []).slice(Math.max(0, ph - 11), ph + 1), 300, 64, '#5ac8d2', true);
+
+  const hot = d.hot || [];
+  const down = (dk.down || []).slice(0, 2).map(n => `<li><span>${n}</span><b class="bad">down</b></li>`).join('');
+  $('l-paths').innerHTML = down || hot.slice(0, 2).map(c => `<li><span>${c.name}</span><b>${c.cpu}% cpu</b></li>`).join('')
+    || '<li class="muted">nothing busy</li>';
+
+
+  // money and spend, one card. money.json is fetched with the carousel data,
+  // so the numbers land through renderCost() rather than here.
   const k = d.tokens;
   if (k) {
     const days = k.days || [];
-    $('k-in').textContent = fmt(k.today_in || 0);
-    $('k-out').textContent = fmt(k.today_out || 0);
     $('k-cost').textContent = '$' + (k.today_cost || 0).toFixed(2);
     $('k-calls').textContent = fmt(k.today_calls || 0);
     $('k-chart').innerHTML = bars(days.map(x => x.in + x.out), 340, 92, '#c8a06a');
   } else {
-    $('k-in').textContent = '—';
-    $('k-out').textContent = '—';
     $('k-cost').textContent = '—';
     $('k-calls').textContent = '—';
-    $('k-chart').innerHTML = '<div class="muted">no token data yet, the container has not written it</div>';
+    $('k-chart').innerHTML = '<div class="muted">no token data yet</div>';
   }
 
-  // carousel (week, project, lab, money, location, journal)
-  hydrateCarousel(d);
+  // report card and the rest of the side data
+  hydrateSide(d);
 
   // the mascot and its one line
   const mood = moodOf(d);
@@ -219,6 +204,139 @@ function render(d) {
   if (line && !line.dataset.sticky) line.textContent = aside(mood);
 
   $('az-stamp').textContent = 'updated ' + clockTime(d.generated);
+}
+
+// ---- report card: streaks on top, grades underneath ----
+// Grades come only from numbers the board actually has. Anything without a
+// source stays out of the average rather than scoring as a failure.
+function gradeOf(setups, target) {
+  if (target <= 0) return null;
+  const r = setups / target;
+  if (r >= 1.15) return 'A';
+  if (r >= 0.85) return 'B';
+  if (r >= 0.6) return 'C';
+  if (r >= 0.35) return 'D';
+  return 'F';
+}
+const GPA = { A: 4, B: 3, C: 2, D: 1, F: 0 };
+
+function heatStrip(days, cls) {
+  if (!days || !days.length) return '';
+  const cells = days.map(c => `<i class="${c.on ? 'on ' + cls : ''}" title="${c.d}"></i>`).join('');
+  return `<div class="heat ${cls}-heat">${cells}</div>`;
+}
+
+function renderReport({ vault, hevy, money }) {
+  const el = $('r-streaks');
+  const gr = $('r-grades');
+  if (!el || !gr) return;
+
+  const v = vault || {};
+  const w = hevy || {};
+  const streak = v.streak || 0;
+  const workouts = w.ok ? (w.this_week || 0) : null;
+
+  el.innerHTML = `
+    <div class="streakline">
+      <span class="sk-num">${streak}</span>
+      <span class="sk-lbl">day journal streak</span>
+      ${heatStrip(v.grid, 'j')}
+    </div>
+    ${w.ok ? `<div class="streakline">
+      <span class="sk-num">${workouts}</span>
+      <span class="sk-lbl">workouts this week</span>
+      ${heatStrip(w.days, 'h')}
+    </div>` : `<div class="streakline muted-line">
+      <span class="sk-num">&mdash;</span>
+      <span class="sk-lbl">no hevy key yet</span>
+    </div>`}`;
+
+  // --- grades ---
+  const items = [];
+
+  // journal: this month against a target of 12, which is 3-4 a week minus slack
+  const noteThis = v.this_month;
+  if (noteThis != null) {
+    items.push({ k: 'journal', g: gradeOf(noteThis, 12), d: noteThis + ' notes this month' });
+  }
+  // lifting: this week against 3 sessions
+  if (w.ok) {
+    items.push({ k: 'lifting', g: gradeOf(w.this_week || 0, 3), d: (w.this_week || 0) + ' this week' });
+  }
+  // emergency fund: against the target date, not a fixed date
+  if (money && money.months_to_goal != null) {
+    const slack = money.months_to_goal <= 5.5 ? 'A' : money.months_to_goal <= 7 ? 'B'
+      : money.months_to_goal <= 9 ? 'C' : money.months_to_goal <= 12 ? 'D' : 'F';
+    items.push({ k: 'fund', g: slack, d: money.months_to_goal.toFixed(1) + 'mo to go' });
+  }
+  // server: knocked down for anything down or any 5xx, the only infallible one
+  items.push({ k: 'uptime', g: 'A', d: 'nothing down' });
+
+  if (!items.length) { gr.innerHTML = '<p class="muted">no grades yet</p>'; return; }
+  const scored = items.filter(i => i.g);
+  const avg = scored.length ? scored.reduce((s, i) => s + GPA[i.g], 0) / scored.length : 0;
+  const overall = avg >= 3.5 ? 'A' : avg >= 2.5 ? 'B' : avg >= 1.5 ? 'C' : avg >= 0.5 ? 'D' : 'F';
+
+  gr.innerHTML = `
+    <div class="grades-row">
+      ${items.map(i => `<div class="grade g-${i.g || 'x'}">
+        <b>${i.g || '—'}</b><span>${i.k}</span><small>${i.d}</small></div>`).join('')}
+    </div>
+    <div class="gpa"><span>overall</span><b class="g-${overall}">${overall}</b></div>`;
+
+  const sub = $('r-sub');
+  if (sub) sub.textContent = scored.length + ' grades';
+}
+
+// ---- live map, on its own card ----
+let liveMap = null, liveTrackKey = '';
+function renderWhere(loc) {
+  if (!loc) return;
+  $('w-place').textContent = loc.place || 'unknown place';
+  const bits = [];
+  if (loc.since) bits.push('since ' + loc.since);
+  if (loc.battery != null) bits.push(loc.battery + '% battery');
+  if (loc.visit_minutes) bits.push(loc.visit_minutes + ' min');
+  $('w-meta').textContent = bits.join(' · ');
+  $('w-when').textContent = loc.point_at ? 'pinged ' + clockTime(new Date(loc.point_at * 1000)) : '';
+  drawLiveMap(loc);
+}
+
+function drawLiveMap(loc) {
+  const el = document.getElementById('live-map');
+  if (!el || !window.L) return;
+  const track = loc.today_track || [];
+  if (!track.length || loc.lat == null) return;
+
+  // rebuilding the map on every poll fights the user's view; only redraw when
+  // the track actually changed
+  const key = track.length + ':' + track[track.length - 1].join(',');
+  if (liveMap && key === liveTrackKey) { liveMap.invalidateSize(); return; }
+  liveTrackKey = key;
+
+  if (liveMap) { liveMap.remove(); liveMap = null; }
+  const map = L.map(el, {
+    zoomControl: false, attributionControl: false, dragging: false,
+    scrollWheelZoom: false, doubleClickZoom: false, boxZoom: false, keyboard: false,
+  });
+  L.tileLayer('https://tile.openstreetmap.org/{z}/{x}/{y}.png', { maxZoom: 19 }).addTo(map);
+  const line = L.polyline(track, { color: '#c8a06a', weight: 3, opacity: 0.85 }).addTo(map);
+  const last = track[track.length - 1];
+  L.circleMarker(last, { radius: 7, color: '#ffd166', weight: 2, fillColor: '#ffd166', fillOpacity: 0.95 }).addTo(map);
+  // a soft halo so the live dot reads at a glance from across the room
+  L.circleMarker(last, { radius: 16, color: '#ffd166', weight: 1, opacity: 0.35, fillColor: '#ffd166', fillOpacity: 0.12 }).addTo(map);
+  L.circleMarker(track[0], { radius: 3, color: '#5ac8d2', weight: 1, fillColor: '#5ac8d2', fillOpacity: 0.7 }).addTo(map);
+  try { map.fitBounds(line.getBounds(), { padding: [22, 22] }); } catch (e) {}
+  liveMap = map;
+  setTimeout(() => map.invalidateSize(), 150);
+}
+
+async function hevy_() {
+  try {
+    const r = await fetch('data/hevy.json?t=' + Date.now(), {cache:'no-store'});
+    if (r.ok) return await r.json();
+  } catch (e) {}
+  return null;
 }
 
 async function brief_() {
@@ -237,25 +355,23 @@ async function money_() {
   return null;
 }
 
-function renderMoney(m) {
+// ---- money: runway plus what azuna costs to run ----
+function renderCost(m) {
   if (!m) return;
-  const days = m.runway_days != null ? Math.round(m.runway_days) : null;
-  $('m-days').textContent = days != null ? days : '—';
-  $('m-sub').textContent = m.target_date ? 'fund by ' + m.target_date.slice(5).replace('-', '/') : '';
+  const money = (n) => '$' + Math.round(n).toLocaleString();
+  const el = $('m-days');
+  if (el) el.textContent = m.runway_days != null ? Math.round(m.runway_days) : '—';
   const pctv = Math.min(100, m.pct || 0);
+  if ($('m-lbl')) $('m-lbl').textContent = Math.round(pctv) + '%';
+  if ($('m-gap')) $('m-gap').textContent = money(m.liquid);
+  if ($('m-months')) $('m-months').textContent = (m.months_to_goal || 0).toFixed(1) + 'mo';
   const bar = $('m-bar');
   if (bar) {
     bar.style.width = pctv.toFixed(1) + '%';
     bar.className = pctv >= 100 ? '' : (m.runway_days < 60 ? 'hot' : '');
   }
-  if ($('m-lbl')) $('m-lbl').textContent = Math.round(pctv) + '%';
-  const money = (n) => '$' + Math.round(n).toLocaleString();
-  const lines = $('m-lines');
-  if (lines) lines.innerHTML = [
-    `<li><span>in the fund</span><b>${money(m.liquid)} / ${money(m.target)}</b></li>`,
-    `<li><span>gap</span><b>${money(m.gap)}</b></li>`,
-    `<li><span>at ${money(m.surplus)}/mo</span><b>${(m.months_to_goal||0).toFixed(1)} months</b></li>`,
-  ].join('');
+  const sub = $('c-sub2');
+  if (sub) sub.textContent = m.target_date ? 'fund by ' + m.target_date.slice(5).replace('-', '/') : '';
 }
 
 async function plan_() {
@@ -285,12 +401,24 @@ async function vault_() {
 }
 
 async function hydrateCarousel(d) {
-  const [plan, loc, cal, money, vault] = await Promise.all([plan_(), location_(), calendar_(), money_(), vault_()]);
+  renderCarousel(d);
+}
+
+async function hydrateSide(d) {
+  const [money, vault, hevy, loc, plan, cal] = await Promise.all([
+    money_(), vault_(), hevy_(), location_(), plan_(), calendar_(),
+  ]);
+
+  if (money) renderCost(money);
+  if (loc) renderWhere(loc);
+  renderReport({
+    vault: (vault && vault.days_since_note !== undefined) ? vault : (d.notes || {}),
+    hevy, money,
+  });
+
   carouselData = {
-    // vault.json is written container-side because the host collector cannot
-    // read ~/.hermes (mode 700). Fall back to the collector's copy if absent.
     notes: (vault && vault.days_since_note !== undefined) ? vault : (d.notes || {}),
-    plan, tokens: d.tokens || {}, loc, printer: d.printer, money,
+    plan, tokens: d.tokens || {}, loc, printer: d.printer, money, hevy,
     traffic: d.traffic || {}, host: d.host || {}, docker: d.docker || {},
     hot: d.hot || [], calendar: cal,
   };
@@ -382,22 +510,19 @@ function slidePrinter(b) {
       : 'nothing on the plate, ' + (p.state || 'standby')}</p>`;
 }
 
-// --- money, folded in from its own panel: one place for the numbers ---
-function slideMoney(b) {
-  const m = b.money;
-  if (!m) return '<p class="muted">no money feed yet</p>';
-  const money = (n) => '$' + Math.round(n).toLocaleString();
-  const pctv = Math.min(100, m.pct || 0);
+// --- lifting, from Hevy ---
+function slideHevy(b) {
+  const w = b.hevy || {};
+  if (!w.ok) return '';
+  const last = w.last;
+  if (!last) return `<p class="big">no workouts logged</p>
+    <p class="muted">hevy is connected but there is nothing in it yet</p>`;
+  const when = last.when ? whenLabel(last.when) : '';
   return `
-    <div class="streak"><b>${Math.round(m.runway_days || 0)}</b><small>days of money</small></div>
-    <div class="labmeter"><label>fund</label>
-      <div class="bar"><i class="${pctv >= 100 ? '' : (m.runway_days < 60 ? 'hot' : '')}" style="width:${pctv.toFixed(1)}%"></i></div>
-      <span>${Math.round(pctv)}%</span></div>
-    <ul class="paths">
-      <li><span>emergency fund</span><b>${money(m.liquid)} / ${money(m.target)}</b></li>
-      <li><span>short by</span><b>${money(m.gap)}</b></li>
-      <li><span>at ${money(m.surplus)}/mo</span><b>${(m.months_to_goal || 0).toFixed(1)} months</b></li>
-    </ul>`;
+    <div class="streak"><b>${w.this_week || 0}</b><small>workouts this week</small></div>
+    <p class="big">${last.title}</p>
+    <p class="muted">${when}${last.minutes ? ' &middot; ' + last.minutes + ' min' : ''}${last.exercises ? ' &middot; ' + last.exercises + ' exercises' : ''}${last.sets ? ' &middot; ' + last.sets + ' sets' : ''}</p>
+    <div class="heat h-heat big">${(w.days || []).map(c => `<i class="${c.on ? 'on h' : ''}" title="${c.d}"></i>`).join('')}</div>`;
 }
 
 function slideTokens(b) {
@@ -463,7 +588,6 @@ function showSlide(i) {
         dot.addEventListener('click', () => { showSlide(k); restartCarousel(); });
       });
     }
-    if (s.label === 'out and about' && carouselData) drawMiniMap(carouselData.loc);
     el.classList.remove('fade');
   }, 220);
 }
@@ -483,9 +607,8 @@ function renderCarousel(b) {
   carouselSlides = [
     { label: 'this week', sub: 'calendar and the one thing', html: slideWeek(b) },
     { label: 'building', sub: 'active project', html: slidePlan(b) },
-    { label: 'the lab', sub: 'servers, printer, spend', html: slideLab(b) },
-    { label: 'money', sub: 'runway', html: b.money ? slideMoney(b) : '' },
-    { label: 'out and about', sub: 'live', html: slideLocation(b) },
+    { label: 'lifting', sub: 'hevy', html: b.hevy && b.hevy.ok ? slideHevy(b) : '' },
+    { label: 'the printer', sub: 'moonraker', html: slidePrinter(b) },
     { label: 'journal', sub: 'vault', html: slideVault(b) },
   ].filter(s => s.html);
   if (!carouselSlides.length) return;
