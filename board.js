@@ -4,6 +4,29 @@ const fmt = (n) => n >= 1e9 ? (n/1e9).toFixed(1)+'B' : n >= 1e6 ? (n/1e6).toFixe
 const rate = (b) => b >= 1048576 ? (b/1048576).toFixed(1)+'M/s' : b >= 1024 ? (b/1024).toFixed(0)+'k/s' : b+'B/s';
 const bytes = (b) => b >= 1e12 ? (b/1e12).toFixed(1)+'T' : b >= 1e9 ? (b/1e9).toFixed(0)+'G' : (b/1e6).toFixed(0)+'M';
 
+// The kiosk's X session has no locale, so the browser reports UTC and every
+// toLocale* call renders Pacific wall-clock times as UTC. Pin the zone here
+// instead of trusting the client, and use these helpers everywhere.
+const TZ = 'America/Los_Angeles';
+const tzOpts = (o) => Object.assign({ timeZone: TZ }, o);
+const clockTime = (d, o) => new Date(d).toLocaleTimeString('en-US', tzOpts(o || { hour: '2-digit', minute: '2-digit' }));
+const clockDate = (d, o) => new Date(d).toLocaleDateString('en-US', tzOpts(o || { weekday: 'long', month: 'long', day: 'numeric' }));
+const dayKey = (d) => {
+  const p = new Intl.DateTimeFormat('en-CA', tzOpts({ year: 'numeric', month: '2-digit', day: '2-digit' })).format(new Date(d));
+  return p; // YYYY-MM-DD
+};
+// Some feeds (Open-Meteo with timezone=auto) hand back a bare "2026-11-11T16:36"
+// that is already Pacific wall-clock, with no offset. new Date() would read that
+// as UTC and shift it hours. Format those directly instead of converting.
+const wallClock = (s) => {
+  const m = /^(\d{4})-(\d{2})-(\d{2})T(\d{2}):(\d{2})/.exec(String(s || ''));
+  if (!m) return null;
+  const h24 = Number(m[4]);
+  const ampm = h24 < 12 ? 'AM' : 'PM';
+  const h12 = h24 % 12 === 0 ? 12 : h24 % 12;
+  return `${h12}:${m[5]} ${ampm}`;
+};
+
 const LINES = [
   "nothing is on fire, which is the whole job",
   "the printer is unplugged. this is on purpose. probably.",
@@ -11,12 +34,65 @@ const LINES = [
   "every hour you don't break prod is an hour well spent",
   "there is a fan curve in here somewhere that hates you",
   "the vault has 480 notes and zero duplicates. allegedly.",
+  "i checked the logs so you don't have to. you're welcome.",
+  "still waiting on that restore test. no rush. except there is.",
 ];
+
+// azuna, drawn in the dark. six eyes' worth of smug in a 60px sphere.
+// no emoji, no external image: it has to render when the network is gone.
+function azunaMark(mood) {
+  const c = { calm: 'var(--teal)', busy: 'var(--gold)', warn: 'var(--warn)', bad: 'var(--bad)' };
+  const col = c[mood] || c.calm;
+  const eyes = mood === 'bad'
+    ? `<path d="M16 22 L24 28 M24 22 L16 28" stroke="${col}" stroke-width="2" stroke-linecap="round"/>
+       <path d="M36 22 L44 28 M44 22 L36 28" stroke="${col}" stroke-width="2" stroke-linecap="round"/>`
+    : mood === 'busy'
+    ? `<path d="M14 25 Q20 20 26 25" stroke="${col}" stroke-width="2" fill="none" stroke-linecap="round"/>
+       <path d="M34 25 Q40 20 46 25" stroke="${col}" stroke-width="2" fill="none" stroke-linecap="round"/>
+       <circle cx="30" cy="34" r="1.6" fill="${col}" opacity=".55"/>`
+    : `<circle cx="20" cy="25" r="3.4" fill="${col}"/><circle cx="40" cy="25" r="3.4" fill="${col}"/>
+       <circle cx="21.2" cy="23.8" r="1.1" fill="#0a0b0e"/><circle cx="41.2" cy="23.8" r="1.1" fill="#0a0b0e"/>`;
+  return `<svg class="aza" viewBox="0 0 60 60" aria-hidden="true">
+    <defs>
+      <radialGradient id="ag" cx="40%" cy="32%" r="72%">
+        <stop offset="0%" stop-color="${col}" stop-opacity=".26"/>
+        <stop offset="100%" stop-color="${col}" stop-opacity="0"/>
+      </radialGradient>
+    </defs>
+    <circle cx="30" cy="30" r="29" fill="url(#ag)"/>
+    <circle cx="30" cy="30" r="20" fill="none" stroke="${col}" stroke-width="1.2" opacity=".55" stroke-dasharray="3 4"/>
+    <circle cx="30" cy="30" r="15.5" fill="#0d1014" stroke="${col}" stroke-width="1.4" opacity=".9"/>
+    ${eyes}
+    <path d="M25 41 Q30 45 35 41" stroke="${col}" stroke-width="1.5" fill="none" stroke-linecap="round" opacity=".8"/>
+  </svg>`;
+}
+
+// the whole board's mood in one word, from the numbers that actually matter
+function moodOf(d) {
+  const h = d.host || {}, dk = d.docker || {};
+  if ((dk.down || []).length || (d.traffic || {}).e5 > 0) return 'bad';
+  if ((h.cpu_pct || 0) >= 85 || (h.temp_c || 0) >= 80) return 'warn';
+  if ((h.cpu_pct || 0) >= 45) return 'busy';
+  return 'calm';
+}
+
+// time-aware asides, so the footer is not the same joke at 7am and 11pm
+function aside(mood) {
+  const hr = Number(new Intl.DateTimeFormat('en-US', tzOpts({ hour: '2-digit', hour12: false })).format(new Date())) % 24;
+  if (mood === 'bad') return 'something is down. i flagged it, go look.';
+  if (mood === 'warn') return 'she is running hot. not panicking, just noticing.';
+  const byTime = hr < 6 ? 'it is the middle of the night. go to bed.'
+    : hr < 10 ? 'morning. the day is still a blank page.'
+    : hr < 17 ? 'afternoon. this is the part where things get finished.'
+    : hr < 22 ? 'evening. good time for the small stuff.'
+    : 'late. whatever you start now, you will resent tomorrow.';
+  return LINES[Math.floor(Math.random() * LINES.length)] + '  ·  ' + byTime;
+}
 
 function clock() {
   const n = new Date();
-  $('clock').textContent = n.toLocaleTimeString(undefined, {hour:'2-digit', minute:'2-digit'});
-  $('date').textContent = n.toLocaleDateString(undefined, {weekday:'long', month:'long', day:'numeric'});
+  $('clock').textContent = clockTime(n);
+  $('date').textContent = clockDate(n);
 }
 
 function spark(vals, w, h, color, fill) {
@@ -61,7 +137,7 @@ function weather(d) {
   v.textContent = good ? 'riding weather. go before it changes its mind.'
     : (w.pop > 60 ? 'wet. the bike stays in.' : 'marginal. you have ridden worse.');
   v.className = 'verdict ' + (good ? 'good' : 'no');
-  if (w.sunset) $('sunline').textContent = 'sunset ' + new Date(w.sunset).toLocaleTimeString(undefined,{hour:'2-digit',minute:'2-digit'});
+  if (w.sunset) $('sunline').textContent = 'sunset ' + (wallClock(w.sunset) || clockTime(w.sunset));
 }
 
 function render(d) {
@@ -72,7 +148,11 @@ function render(d) {
   $('t-hour').textContent = fmt(t.last_hour || 0);
   $('t-e4').textContent = fmt(t.e4 || 0);
   $('t-e5').textContent = fmt(t.e5 || 0);
-  $('t-chart').innerHTML = spark((t.hourly || []).slice(new Date().getHours() - 11), 300, 64, '#5ac8d2', true);
+  // hourly[] are the server's local hours, and the server runs UTC, so the
+  // window has to be picked with the Pacific hour too, not the browser's.
+  const ph = Number(new Intl.DateTimeFormat('en-US', tzOpts({ hour: '2-digit', hour12: false })).format(new Date())) % 24;
+  $('t-chart').innerHTML = spark((t.hourly || []).slice(Math.max(0, ph - 11), ph + 1), 300, 64, '#5ac8d2', true);
+
   $('t-paths').innerHTML = (t.top || []).map(p => `<li><span>${p.path}</span><b>${fmt(p.n)}</b></li>`).join('') || '<li class="muted">no hits yet today</li>';
 
   // server
@@ -125,10 +205,20 @@ function render(d) {
     $('k-chart').innerHTML = '<div class="muted">no token data yet, the container has not written it</div>';
   }
 
-  // carousel (vault, plan, token history, location)
+  // carousel (week, project, lab, money, location, journal)
   hydrateCarousel(d);
 
-  $('az-stamp').textContent = 'updated ' + new Date(d.generated).toLocaleTimeString(undefined,{hour:'2-digit',minute:'2-digit'});
+  // the mascot and its one line
+  const mood = moodOf(d);
+  const moodWord = { calm: 'all quiet', busy: 'working', warn: 'warm', bad: 'look here' }[mood];
+  const mark = $('az-mark');
+  if (mark) mark.innerHTML = azunaMark(mood);
+  const moodEl = $('az-mood');
+  if (moodEl) { moodEl.textContent = moodWord; moodEl.className = 'mood ' + mood; }
+  const line = $('az-line');
+  if (line && !line.dataset.sticky) line.textContent = aside(mood);
+
+  $('az-stamp').textContent = 'updated ' + clockTime(d.generated);
 }
 
 async function brief_() {
@@ -154,11 +244,14 @@ function renderMoney(m) {
   $('m-sub').textContent = m.target_date ? 'fund by ' + m.target_date.slice(5).replace('-', '/') : '';
   const pctv = Math.min(100, m.pct || 0);
   const bar = $('m-bar');
-  bar.style.width = pctv.toFixed(1) + '%';
-  bar.className = pctv >= 100 ? '' : (m.runway_days < 60 ? 'hot' : '');
-  $('m-lbl').textContent = Math.round(pctv) + '%';
+  if (bar) {
+    bar.style.width = pctv.toFixed(1) + '%';
+    bar.className = pctv >= 100 ? '' : (m.runway_days < 60 ? 'hot' : '');
+  }
+  if ($('m-lbl')) $('m-lbl').textContent = Math.round(pctv) + '%';
   const money = (n) => '$' + Math.round(n).toLocaleString();
-  $('m-lines').innerHTML = [
+  const lines = $('m-lines');
+  if (lines) lines.innerHTML = [
     `<li><span>in the fund</span><b>${money(m.liquid)} / ${money(m.target)}</b></li>`,
     `<li><span>gap</span><b>${money(m.gap)}</b></li>`,
     `<li><span>at ${money(m.surplus)}/mo</span><b>${(m.months_to_goal||0).toFixed(1)} months</b></li>`,
@@ -183,35 +276,128 @@ async function location_() {
 
 let carouselData = null, carouselSlides = [], carouselAt = 0;
 
+async function vault_() {
+  try {
+    const r = await fetch('data/vault.json?t=' + Date.now(), {cache:'no-store'});
+    if (r.ok) return await r.json();
+  } catch (e) {}
+  return null;
+}
+
 async function hydrateCarousel(d) {
-  const [plan, loc] = await Promise.all([plan_(), location_()]);
-  carouselData = { notes: d.notes || {}, plan, tokens: d.tokens || {}, loc, printer: d.printer };
+  const [plan, loc, cal, money, vault] = await Promise.all([plan_(), location_(), calendar_(), money_(), vault_()]);
+  carouselData = {
+    // vault.json is written container-side because the host collector cannot
+    // read ~/.hermes (mode 700). Fall back to the collector's copy if absent.
+    notes: (vault && vault.days_since_note !== undefined) ? vault : (d.notes || {}),
+    plan, tokens: d.tokens || {}, loc, printer: d.printer, money,
+    traffic: d.traffic || {}, host: d.host || {}, docker: d.docker || {},
+    hot: d.hot || [], calendar: cal,
+  };
   renderCarousel(carouselData);
 }
 
-function slideVault(b) {
-  const n = b.notes || {};
-  const days = n.days_since_note != null ? Math.floor(n.days_since_note) : null;
-  const focus = (n.focus || []).map(f => `<li>${f}</li>`).join('');
-  const recent = (n.recent || []).map(r => `<li>${r}</li>`).join('');
+// --- slide 1: the week ahead, not "a carousel of random status" ---
+function slideWeek(b) {
+  const cal = (b.calendar && b.calendar.events) || [];
+  const p = b.plan || {};
+  const a = p.active;
+  const upcoming = cal.slice(0, 4).map(e =>
+    `<li><span class="when">${whenLabel(e.start)}</span><span class="what">${e.summary}</span></li>`).join('');
+  const task = a && a.tasks && a.tasks.length ? a.tasks[0] : null;
   return `
-    <div class="streak"><b>${days != null ? days : '&mdash;'}</b><small>days since a journal entry</small></div>
-    <ul class="focus">${focus || '<li class="muted">no quarter goals set</li>'}</ul>
-    <h3>recently, by me</h3>
-    <ul class="recent">${recent || '<li class="muted">nothing logged</li>'}</ul>`;
+    ${upcoming ? `<ul class="agenda">${upcoming}</ul>` : '<p class="muted">nothing on the calendar for a week. that is either good or a warning.</p>'}
+    ${task ? `<div class="todo">${task}</div>` : ''}
+    ${a ? `<p class="muted tiny">the one thing is still ${a.title}</p>` : ''}`;
 }
 
 function slidePlan(b) {
   const p = b.plan || {};
   if (!p.active) return '<p class="muted" style="font-size:1.05rem">nothing active on the project page</p>';
   const a = p.active;
-  const tasks = (a.tasks || []).slice(0, 3).map(t => `<li>${t}</li>`).join('');
-  const next = (p.next || []).slice(0, 3).map(t => `<li>${t}</li>`).join('');
+  const tasks = (a.tasks || []).slice(0, 2).map(t => `<li>${t}</li>`).join('');
+  const next = (p.next || []).slice(0, 2).map(t => `<li>${t}</li>`).join('');
   return `
-    <h3>the one thing</h3>
     <p class="big">${a.title}</p>
     <ul class="focus">${tasks || '<li class="muted">no next action written down</li>'}</ul>
-    ${next ? `<h3>then</h3><ul class="recent">${next}</ul>` : ''}`;
+    ${a.done_when ? `<p class="done-when">done = ${a.done_when}</p>` : ''}
+    ${next ? `<h3>after this</h3><ul class="recent tight">${next}</ul>` : ''}`;
+}
+
+function slideVault(b) {
+  const n = b.notes || {};
+  const raw = n.days_since_note;
+  const days = raw != null ? Math.floor(raw) : null;
+  const goals = (n.focus || []);
+  const focus = goals.slice(0, 2).map(f => `<li>${f}</li>`).join('');
+
+  const last = n.last_note ? `<p class="muted tiny">last one: ${n.last_note}</p>` : '';
+  if (days == null) {
+    return `<p class="big">no journal entry on record</p>
+      <p class="muted">the gap is the whole point of writing it down.</p>${last}`;
+  }
+  const since = days === 0 ? 'written today. streak alive.'
+    : days === 1 ? 'day since you last wrote something down'
+    : 'days since you last wrote something down';
+  const nudge = days >= 3
+    ? `<p class="muted">${['two lines on a boring day still counts.', 'nothing interesting has to go in it.', 'you have gone further and come back before.'][days % 3]}</p>`
+    : '';
+  return `
+    <div class="streak"><b>${days}</b><small>${since}</small></div>
+    ${nudge}${last}
+    ${focus ? `<h3>this quarter</h3><ul class="focus">${focus}</ul>` : '<p class="muted tiny">no quarter goals set in Goals.md</p>'}`;
+}
+
+// --- slide 3: the lab. everything technical in one place ---
+function slideLab(b) {
+  const h = b.host || {}, dk = b.docker || {}, hot = b.hot || [], t = b.traffic || {};
+  const pct = (a, c) => (c ? Math.round((a / c) * 100) : 0);
+  const meter = (label, v, txt) => `
+    <div class="labmeter"><label>${label}</label>
+      <div class="bar"><i class="${v >= 85 ? 'hot' : ''}" style="width:${Math.min(100, v)}%"></i></div>
+      <span>${txt}</span></div>`;
+  const top = hot.slice(0, 2).map(c => `<li><span>${c.name}</span><b>${c.cpu}%</b></li>`).join('');
+  const down = (dk.down || []).slice(0, 2).map(n => `<li><span>${n}</span><b class="bad">down</b></li>`).join('');
+  return `
+    ${meter('cpu', h.cpu_pct ?? 0, (h.cpu_pct ?? 0) + '%')}
+    ${meter('mem', pct(h.mem_used, h.mem_total), pct(h.mem_used, h.mem_total) + '%')}
+    ${meter('disk', pct(h.disk_used, h.disk_total), bytes(h.disk_used) + ' / ' + bytes(h.disk_total))}
+    <div class="labfoot">
+      <span><b>${dk.running || 0}/${dk.total || 0}</b> containers</span>
+      <span><b>${fmt(t.today || 0)}</b> hits</span>
+      <span><b>${h.temp_c ? h.temp_c + '&deg;' : '&mdash;'}</b> cpu</span>
+      <span><b>${h.uptime_days || '&mdash;'}d</b> up</span>
+    </div>
+    <ul class="paths">${down || top}</ul>`;
+}
+
+function slidePrinter(b) {
+  const p = b.printer;
+  if (!p) return '<p class="muted">moonraker is not answering</p>';
+  const busy = (p.progress || 0) > 0 || p.file;
+  return `
+    <p class="big">${busy ? (p.file || 'printing') : 'idle'}</p>
+    <p class="muted">${busy
+      ? Math.round(p.progress) + '% done &middot; nozzle ' + Math.round(p.hotend || 0) + '&deg; &middot; bed ' + Math.round(p.bed || 0) + '&deg;'
+      : 'nothing on the plate, ' + (p.state || 'standby')}</p>`;
+}
+
+// --- money, folded in from its own panel: one place for the numbers ---
+function slideMoney(b) {
+  const m = b.money;
+  if (!m) return '<p class="muted">no money feed yet</p>';
+  const money = (n) => '$' + Math.round(n).toLocaleString();
+  const pctv = Math.min(100, m.pct || 0);
+  return `
+    <div class="streak"><b>${Math.round(m.runway_days || 0)}</b><small>days of money</small></div>
+    <div class="labmeter"><label>fund</label>
+      <div class="bar"><i class="${pctv >= 100 ? '' : (m.runway_days < 60 ? 'hot' : '')}" style="width:${pctv.toFixed(1)}%"></i></div>
+      <span>${Math.round(pctv)}%</span></div>
+    <ul class="paths">
+      <li><span>emergency fund</span><b>${money(m.liquid)} / ${money(m.target)}</b></li>
+      <li><span>short by</span><b>${money(m.gap)}</b></li>
+      <li><span>at ${money(m.surplus)}/mo</span><b>${(m.months_to_goal || 0).toFixed(1)} months</b></li>
+    </ul>`;
 }
 
 function slideTokens(b) {
@@ -227,16 +413,6 @@ function slideTokens(b) {
     <div class="bignum">$${total.toFixed(2)}<small>last 14 days</small></div>
     <div class="bars">${bars}</div>
     <div class="axis"><span>${days[0].d}</span><span>${days[days.length-1].d}</span></div>`;
-}
-
-function slidePrinter(b) {
-  const p = b.printer;
-  if (!p) return '<p class="muted">moonraker is not answering</p>';
-  const busy = (p.progress || 0) > 0 || p.file;
-  return `
-    <h3>the printer</h3>
-    <p class="big">${busy ? (p.file || 'printing') : 'idle'}</p>
-    <p class="muted">${busy ? Math.round(p.progress) + '% done' : 'nothing on the plate'}</p>`;
 }
 
 function slideLocation(b) {
@@ -287,7 +463,7 @@ function showSlide(i) {
         dot.addEventListener('click', () => { showSlide(k); restartCarousel(); });
       });
     }
-    if (s.label === 'location' && carouselData) drawMiniMap(carouselData.loc);
+    if (s.label === 'out and about' && carouselData) drawMiniMap(carouselData.loc);
     el.classList.remove('fade');
   }, 220);
 }
@@ -302,12 +478,15 @@ function pauseCarousel() { if (carouselTimer) { clearInterval(carouselTimer); ca
 function renderCarousel(b) {
   const el = $('slide');
   if (!el) return;
+  // Three views, each one a coherent thing rather than a status readout:
+  // what's coming, what you're building, and what the box is doing.
   carouselSlides = [
-    { label: 'vault', sub: 'streak and focus', html: slideVault(b) },
-    { label: 'printer', sub: (b.printer && b.printer.state) || 'offline', html: slidePrinter(b) },
-    { label: 'plan', sub: 'one thing at a time', html: slidePlan(b) },
-    { label: 'tokens', sub: 'spend', html: slideTokens(b) },
-    { label: 'location', sub: 'live', html: slideLocation(b) },
+    { label: 'this week', sub: 'calendar and the one thing', html: slideWeek(b) },
+    { label: 'building', sub: 'active project', html: slidePlan(b) },
+    { label: 'the lab', sub: 'servers, printer, spend', html: slideLab(b) },
+    { label: 'money', sub: 'runway', html: b.money ? slideMoney(b) : '' },
+    { label: 'out and about', sub: 'live', html: slideLocation(b) },
+    { label: 'journal', sub: 'vault', html: slideVault(b) },
   ].filter(s => s.html);
   if (!carouselSlides.length) return;
 
@@ -342,12 +521,12 @@ async function calendar_() {
 
 function whenLabel(iso) {
   const d = new Date(iso), now = new Date();
-  const sameDay = d.toDateString() === now.toDateString();
-  const tmrw = new Date(now.getTime() + 86400000).toDateString() === d.toDateString();
-  const time = d.toLocaleTimeString(undefined, {hour:'numeric', minute:'2-digit'});
+  const sameDay = dayKey(d) === dayKey(now);
+  const tmrw = dayKey(d) === dayKey(now.getTime() + 86400000);
+  const time = clockTime(d, { hour: 'numeric', minute: '2-digit' });
   if (sameDay) return 'today ' + time;
   if (tmrw) return 'tmrw ' + time;
-  return d.toLocaleDateString(undefined, {weekday:'short'}) + ' ' + time;
+  return new Date(d).toLocaleDateString('en-US', tzOpts({ weekday: 'short' })) + ' ' + time;
 }
 
 function renderCalendar(cal) {
@@ -377,7 +556,6 @@ async function pull() {
     render(d);
     renderCalendar(await calendar_());
     renderBrief(await brief_());
-    renderMoney(await money_());
   } catch (e) {
     $('az-line').textContent = 'collector has not run yet';
   }
