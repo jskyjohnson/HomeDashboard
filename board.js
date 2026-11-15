@@ -165,10 +165,16 @@ function render(d) {
   $('t-e5').textContent = fmt(t.e5 || 0);
   $('l-up').textContent = h.uptime_days ? 'up ' + h.uptime_days + 'd' : '';
 
-  // hourly[] are the server's local hours, and the server runs UTC, so the
-  // window has to be picked with the Pacific hour too, not the browser's.
-  const ph = Number(new Intl.DateTimeFormat('en-US', tzOpts({ hour: '2-digit', hour12: false })).format(new Date())) % 24;
-  $('t-chart').innerHTML = spark((t.hourly || []).slice(Math.max(0, ph - 11), ph + 1), 300, 64, '#5ac8d2', true);
+  // hourly[] is today's UTC buckets, not Pacific wall-clock hours. Use the
+  // collector's timestamp so a delayed poll still ends at its latest bucket.
+  // Older collectors omit the offset even though their clock is UTC.
+  const stamp = String(d.generated || '');
+  const collected = new Date(/[zZ]$|[+-]\d{2}:?\d{2}$/.test(stamp) ? stamp : stamp + 'Z');
+  const hour = Number.isNaN(collected.getTime()) ? new Date().getUTCHours() : collected.getUTCHours();
+  const hourly = (t.hourly || []).slice(Math.max(0, hour - 11), hour + 1);
+  $('t-chart').innerHTML = hourly.length
+    ? spark(hourly, 300, 64, '#5ac8d2', true)
+    : '<p class="muted">hourly traffic is unavailable</p>';
 
   const hot = d.hot || [];
   const down = (dk.down || []).slice(0, 2).map(n => `<li><span>${n}</span><b class="bad">down</b></li>`).join('');
