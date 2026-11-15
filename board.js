@@ -801,10 +801,14 @@ function renderCarousel(b) {
   showSlide(carouselAt);
 }
 
+let briefText = '', lastCal = null;
+
 function renderBrief(b) {
   const el = $('brief');
   if (!el) return;
   const text = b && b.text ? b.text.trim() : '';
+  briefText = text;
+  if (lastCal) renderCalendar(lastCal);
   if (!text) { el.hidden = true; el.innerHTML = ''; return; }
   el.hidden = false;
   el.innerHTML = `<span class="dot"></span><p>${text}</p>`;
@@ -829,13 +833,15 @@ function whenLabel(iso) {
 }
 
 function renderCalendar(cal) {
+  lastCal = cal;
   const el = $('up-next');
   if (!el) return;
   const evs = (cal && cal.events) ? cal.events.slice(0, 4) : [];
   const sub = $('n-sub');
   if (sub) sub.textContent = evs.length ? 'from your calendar' : '';
   if (!evs.length) {
-    el.innerHTML = '<li><span class="what muted">nothing on the calendar. the planner is the real one.</span></li>';
+    // if the planner note is already up there, do not contradict it with "nothing on"
+    el.innerHTML = briefText ? '' : '<li><span class="what muted">nothing on the calendar, and nothing in the planner. suspicious.</span></li>';
     return;
   }
   el.innerHTML = evs.map(e =>
