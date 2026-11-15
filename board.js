@@ -43,27 +43,52 @@ const LINES = [
 function azunaMark(mood) {
   const c = { calm: 'var(--teal)', busy: 'var(--gold)', warn: 'var(--warn)', bad: 'var(--bad)' };
   const col = c[mood] || c.calm;
+
   const eyes = mood === 'bad'
-    ? `<path d="M16 22 L24 28 M24 22 L16 28" stroke="${col}" stroke-width="2" stroke-linecap="round"/>
-       <path d="M36 22 L44 28 M44 22 L36 28" stroke="${col}" stroke-width="2" stroke-linecap="round"/>`
+    ? `<g class="eyes"><path d="M16 23 L24 29 M24 23 L16 29" stroke="${col}" stroke-width="2.2" stroke-linecap="round"/>
+       <path d="M36 23 L44 29 M44 23 L36 29" stroke="${col}" stroke-width="2.2" stroke-linecap="round"/></g>`
     : mood === 'busy'
-    ? `<path d="M14 25 Q20 20 26 25" stroke="${col}" stroke-width="2" fill="none" stroke-linecap="round"/>
-       <path d="M34 25 Q40 20 46 25" stroke="${col}" stroke-width="2" fill="none" stroke-linecap="round"/>
-       <circle cx="30" cy="34" r="1.6" fill="${col}" opacity=".55"/>`
-    : `<circle cx="20" cy="25" r="3.4" fill="${col}"/><circle cx="40" cy="25" r="3.4" fill="${col}"/>
-       <circle cx="21.2" cy="23.8" r="1.1" fill="#0a0b0e"/><circle cx="41.2" cy="23.8" r="1.1" fill="#0a0b0e"/>`;
+    ? `<g class="eyes"><path d="M14 26 Q20 20 26 26" stroke="${col}" stroke-width="2.2" fill="none" stroke-linecap="round"/>
+       <path d="M34 26 Q40 20 46 26" stroke="${col}" stroke-width="2.2" fill="none" stroke-linecap="round"/></g>`
+    : `<g class="eyes">
+        <ellipse cx="20" cy="25" rx="3.8" ry="4.4" fill="${col}"/>
+        <ellipse cx="40" cy="25" rx="3.8" ry="4.4" fill="${col}"/>
+        <circle cx="21.4" cy="23.4" r="1.4" fill="#0a0b0e"/>
+        <circle cx="41.4" cy="23.4" r="1.4" fill="#0a0b0e"/>
+        <circle cx="18.4" cy="27" r="0.9" fill="#0a0b0e" opacity=".65"/>
+        <circle cx="38.4" cy="27" r="0.9" fill="#0a0b0e" opacity=".65"/>
+      </g>`;
+
+  const mouth = mood === 'bad'
+    ? `<path d="M25 43 Q30 38 35 43" stroke="${col}" stroke-width="1.7" fill="none" stroke-linecap="round"/>`
+    : mood === 'warn'
+    ? `<ellipse cx="30" cy="41.5" rx="3" ry="2.4" fill="none" stroke="${col}" stroke-width="1.5"/>`
+    : mood === 'busy'
+    ? `<circle cx="30" cy="41.5" r="2.2" fill="none" stroke="${col}" stroke-width="1.5" opacity=".9"/>`
+    : `<path d="M25 40 Q30 45.5 35 40" stroke="${col}" stroke-width="1.9" fill="none" stroke-linecap="round"/>`;
+
+  const blush = mood === 'calm'
+    ? `<ellipse cx="13.5" cy="33" rx="3.2" ry="1.8" fill="${col}" opacity=".18"/>
+       <ellipse cx="46.5" cy="33" rx="3.2" ry="1.8" fill="${col}" opacity=".18"/>` : '';
+
+  const brows = mood === 'bad'
+    ? `<path d="M15 17 L25 20.5" stroke="${col}" stroke-width="1.6" stroke-linecap="round" opacity=".8"/>
+       <path d="M45 17 L35 20.5" stroke="${col}" stroke-width="1.6" stroke-linecap="round" opacity=".8"/>` : '';
+
+  const antenna = `<path d="M30 9 L30 14" stroke="${col}" stroke-width="1.3" opacity=".7"/>
+    <circle cx="30" cy="7" r="2" fill="${col}" opacity="${mood === 'calm' ? '.85' : '.55'}"/>`;
+
   return `<svg class="aza" viewBox="0 0 60 60" aria-hidden="true">
     <defs>
       <radialGradient id="ag" cx="40%" cy="32%" r="72%">
-        <stop offset="0%" stop-color="${col}" stop-opacity=".26"/>
+        <stop offset="0%" stop-color="${col}" stop-opacity=".28"/>
         <stop offset="100%" stop-color="${col}" stop-opacity="0"/>
       </radialGradient>
     </defs>
     <circle cx="30" cy="30" r="29" fill="url(#ag)"/>
-    <circle cx="30" cy="30" r="20" fill="none" stroke="${col}" stroke-width="1.2" opacity=".55" stroke-dasharray="3 4"/>
+    <circle cx="30" cy="30" r="20" fill="none" stroke="${col}" stroke-width="1.2" opacity=".5" stroke-dasharray="3 4"/>
     <circle cx="30" cy="30" r="15.5" fill="#0d1014" stroke="${col}" stroke-width="1.4" opacity=".9"/>
-    ${eyes}
-    <path d="M25 41 Q30 45 35 41" stroke="${col}" stroke-width="1.5" fill="none" stroke-linecap="round" opacity=".8"/>
+    ${antenna}${brows}${eyes}${blush}${mouth}
   </svg>`;
 }
 
@@ -76,17 +101,34 @@ function moodOf(d) {
   return 'calm';
 }
 
-// time-aware asides, so the footer is not the same joke at 7am and 11pm
+// what she says. the numbers get a line, but so does he.
+const CHEESE = {
+  calm: [
+    "hope today is being kind to you, you usually earn it.",
+    "i checked everything. nothing wants your attention right now. enjoy that.",
+    "you are allowed to just have an ordinary day, you know.",
+    "i wonder how you are actually doing, not the version you report.",
+    "quiet board, quiet house. this is the good part.",
+  ],
+  busy: [
+    "she is working. so are you, presumably. i believe in at least one of us.",
+    "busy but holding. that is the whole trick, honestly.",
+    "if you are avoiding something, i can see it from here. gently.",
+    "look at us, doing things. terrifying.",
+  ],
+  warn: [
+    "she is running warm. not a crisis, just a thing to notice.",
+    "something is doing more than usual. i would look before it decides for me.",
+  ],
+  bad: [
+    "something is down and i am annoyed about it on your behalf.",
+    "look here when you get a second. not before the coffee.",
+  ],
+};
+
 function aside(mood) {
-  const hr = Number(new Intl.DateTimeFormat('en-US', tzOpts({ hour: '2-digit', hour12: false })).format(new Date())) % 24;
-  if (mood === 'bad') return 'something is down. i flagged it, go look.';
-  if (mood === 'warn') return 'she is running hot. not panicking, just noticing.';
-  const byTime = hr < 6 ? 'it is the middle of the night. go to bed.'
-    : hr < 10 ? 'morning. the day is still a blank page.'
-    : hr < 17 ? 'afternoon. this is the part where things get finished.'
-    : hr < 22 ? 'evening. good time for the small stuff.'
-    : 'late. whatever you start now, you will resent tomorrow.';
-  return LINES[Math.floor(Math.random() * LINES.length)] + '  ·  ' + byTime;
+  const pool = CHEESE[mood] || CHEESE.calm;
+  return pool[Math.floor(Math.random() * pool.length)];
 }
 
 function clock() {
@@ -294,10 +336,19 @@ function renderReport({ vault, hevy, money }) {
   if (sub) sub.textContent = scored.length + ' grades';
 }
 
-// ---- live map, on its own card ----
-let liveMap = null, liveTrackKey = '';
+// ---- live map, with views: today, the week, the month, the places, the rain ----
+let liveMap = null, liveKey = '', lastLoc = null, mapView = 'today';
+const MAP_VIEWS = [
+  { k: 'today', label: 'today' },
+  { k: 'week', label: '7 days' },
+  { k: 'month', label: '30 days' },
+  { k: 'places', label: 'places' },
+  { k: 'rain', label: 'rain' },
+];
+
 function renderWhere(loc) {
   if (!loc) return;
+  lastLoc = loc;
   $('w-place').textContent = loc.place || 'unknown place';
   const bits = [];
   if (loc.since) bits.push('since ' + loc.since);
@@ -305,36 +356,155 @@ function renderWhere(loc) {
   if (loc.visit_minutes) bits.push(loc.visit_minutes + ' min');
   $('w-meta').textContent = bits.join(' · ');
   $('w-when').textContent = loc.point_at ? 'pinged ' + clockTime(new Date(loc.point_at * 1000)) : '';
+  drawMapDots();
   drawLiveMap(loc);
+}
+
+function drawMapDots() {
+  const el = $('map-dots');
+  if (!el) return;
+  el.innerHTML = MAP_VIEWS
+    .map(v => `<span class="${v.k === mapView ? 'on' : ''}" data-v="${v.k}">${v.label}</span>`).join('');
+  [...el.children].forEach(b => {
+    b.addEventListener('click', () => {
+      mapView = b.dataset.v;
+      liveKey = '';
+      drawMapDots();
+      if (lastLoc) drawLiveMap(lastLoc);
+    });
+  });
+}
+
+function drawPlaces(loc) {
+  const el = $('w-places');
+  if (!el) return;
+  const list = (loc.places || []);
+  el.innerHTML = list.length
+    ? list.map(p => {
+        const hrs = p.minutes >= 60 ? (p.minutes / 60).toFixed(1) + 'h' : p.minutes + 'm';
+        return `<li><span>${p.name}</span><b>${hrs}</b><em>${p.visits}×</em></li>`;
+      }).join('')
+    : '<li><span>no named places yet. dawarich is still naming things.</span></li>';
 }
 
 function drawLiveMap(loc) {
   const el = document.getElementById('live-map');
-  if (!el || !window.L) return;
-  const track = loc.today_track || [];
-  if (!track.length || loc.lat == null) return;
+  const listEl = document.getElementById('w-places');
+  if (!el || !window.L || !loc) return;
 
-  // rebuilding the map on every poll fights the user's view; only redraw when
-  // the track actually changed
-  const key = track.length + ':' + track[track.length - 1].join(',');
-  if (liveMap && key === liveTrackKey) { liveMap.invalidateSize(); return; }
-  liveTrackKey = key;
+  // places is a list, so the map gets out of the way
+  const placesMode = mapView === 'places';
+  if (listEl) listEl.classList.toggle('on', placesMode);
+  el.style.display = placesMode ? 'none' : '';
+  if (placesMode) { drawPlaces(loc); return; }
 
+  const radar = loc.radar || {};
+  const track = mapView === 'week' ? (loc.week_track || [])
+    : mapView === 'month' ? (loc.month_track || [])
+    : (loc.today_track || []);
+  const key = [mapView, track.length, track.length ? track[track.length - 1].join(',') : '', radar.ts || ''].join(':');
+  if (liveMap && key === liveKey) { liveMap.invalidateSize(); return; }
+  liveKey = key;
   if (liveMap) { liveMap.remove(); liveMap = null; }
+
+  el.classList.toggle('radar', mapView === 'rain');
   const map = L.map(el, {
     zoomControl: false, attributionControl: false, dragging: false,
     scrollWheelZoom: false, doubleClickZoom: false, boxZoom: false, keyboard: false,
   });
+
+  const here = (loc.lat != null && loc.lon != null) ? [loc.lat, loc.lon] : null;
+  const home = here || [47.6101, -122.2015];
+
+  if (mapView === 'rain') {
+    // same inverted osm base as the other views, but the radar layer skips the filter
+    L.tileLayer('https://tile.openstreetmap.org/{z}/{x}/{y}.png', { maxZoom: 19 }).addTo(map);
+    // noaa nexrad composite, served keyless by iowa state. rainviewer's public
+    // tiles now watermark anything outside their paid zoom range.
+    L.tileLayer('https://mesonet.agron.iastate.edu/cache/tile.py/1.0.0/nexrad-n0q-900913/{z}/{x}/{y}.png', {
+      opacity: 0.7, maxZoom: 19, className: 'radar-tile',
+    }).addTo(map);
+    map.setView(home, 9);
+    if (here) {
+      L.circleMarker(here, { radius: 6, color: '#ffd166', weight: 2, fillColor: '#ffd166', fillOpacity: 0.9 }).addTo(map);
+    }
+    liveMap = map;
+    setTimeout(() => map.invalidateSize(), 150);
+    return;
+  }
+
   L.tileLayer('https://tile.openstreetmap.org/{z}/{x}/{y}.png', { maxZoom: 19 }).addTo(map);
-  const line = L.polyline(track, { color: '#c8a06a', weight: 3, opacity: 0.85 }).addTo(map);
+
+  if (!track.length) {
+    map.setView(home, 11);
+    if (here) L.circleMarker(here, { radius: 7, color: '#ffd166', weight: 2, fillColor: '#ffd166', fillOpacity: 0.95 }).addTo(map);
+    liveMap = map;
+    setTimeout(() => map.invalidateSize(), 150);
+    return;
+  }
+
+  const line = L.polyline(track, {
+    color: '#c8a06a', weight: mapView === 'today' ? 3 : 2, opacity: mapView === 'today' ? 0.85 : 0.6,
+  }).addTo(map);
+
   const last = track[track.length - 1];
+  // only today gets the halo; a month of halos is just noise
+  if (mapView === 'today') {
+    L.circleMarker(last, { radius: 16, color: '#ffd166', weight: 1, opacity: 0.35, fillColor: '#ffd166', fillOpacity: 0.12 }).addTo(map);
+  }
   L.circleMarker(last, { radius: 7, color: '#ffd166', weight: 2, fillColor: '#ffd166', fillOpacity: 0.95 }).addTo(map);
-  // a soft halo so the live dot reads at a glance from across the room
-  L.circleMarker(last, { radius: 16, color: '#ffd166', weight: 1, opacity: 0.35, fillColor: '#ffd166', fillOpacity: 0.12 }).addTo(map);
   L.circleMarker(track[0], { radius: 3, color: '#5ac8d2', weight: 1, fillColor: '#5ac8d2', fillOpacity: 0.7 }).addTo(map);
+
   try { map.fitBounds(line.getBounds(), { padding: [22, 22] }); } catch (e) {}
   liveMap = map;
   setTimeout(() => map.invalidateSize(), 150);
+}
+
+async function forecast_() {
+  try {
+    const r = await fetch('data/forecast.json?t=' + Date.now(), { cache: 'no-store' });
+    if (r.ok) return await r.json();
+  } catch (e) {}
+  return null;
+}
+
+// the kiosk has no colour-emoji font, so these are drawn instead of pasted
+function wxIcon(code) {
+  const c = 'var(--dim)', w = 1.4;
+  const sun = `<circle cx="12" cy="12" r="4" fill="none" stroke="var(--gold)" stroke-width="${w}"/>
+    <g stroke="var(--gold)" stroke-width="${w}" stroke-linecap="round" opacity=".8">
+    <path d="M12 3v2M12 19v2M3 12h2M19 12h2M5.6 5.6l1.4 1.4M17 17l1.4 1.4M18.4 5.6L17 7M7 17l-1.4 1.4"/></g>`;
+  const cloud = `<path d="M7 16h9a3.2 3.2 0 0 0 .3-6.4A4.6 4.6 0 0 0 7.6 10 3 3 0 0 0 7 16z" fill="none" stroke="${c}" stroke-width="${w}" stroke-linejoin="round"/>`;
+  const rain = cloud + `<g stroke="var(--teal)" stroke-width="${w}" stroke-linecap="round"><path d="M9 18l-1 2M13 18l-1 2M17 18l-1 2"/></g>`;
+  const snow = cloud + `<g stroke="var(--teal)" stroke-width="1.2" stroke-linecap="round"><path d="M9 18v2M8 19h2M16 18v2M15 19h2"/></g>`;
+  const fog = `<g stroke="${c}" stroke-width="${w}" stroke-linecap="round"><path d="M4 10h16M6 14h12M4 18h16"/></g>`;
+  const storm = cloud + `<path d="M13 16l-3 4h3l-1 3 4-5h-3l1-2z" fill="var(--gold)" opacity=".9"/>`;
+  const body = code === 0 ? sun
+    : code === 1 ? sun + cloud
+    : code === 2 ? cloud
+    : code === 3 ? cloud
+    : code === 45 || code === 48 ? fog
+    : (code >= 51 && code <= 57) ? rain
+    : (code >= 61 && code <= 67) ? rain
+    : (code >= 71 && code <= 77) ? snow
+    : (code >= 80 && code <= 82) ? rain
+    : (code >= 85 && code <= 86) ? snow
+    : (code >= 95) ? storm
+    : cloud;
+  return `<svg viewBox="0 0 24 24" width="22" height="22" aria-hidden="true">${body}</svg>`;
+}
+
+function renderForecast(f) {
+  const el = $('forecast');
+  if (!el) return;
+  if (!f || !f.hours || !f.hours.length) { el.innerHTML = ''; return; }
+  el.innerHTML = f.hours.slice(0, 6).map((h, i) => `
+    <div class="fc ${i === 0 ? 'now' : ''}">
+      <span class="t">${i === 0 ? 'now' : h.t}</span>
+      <span class="i">${wxIcon(h.code)}</span>
+      <span class="d">${h.temp != null ? h.temp + '&deg;' : '&mdash;'}</span>
+      <span class="p">${h.pop != null ? h.pop + '%' : ''}</span>
+    </div>`).join('');
 }
 
 async function hevy_() {
@@ -661,8 +831,13 @@ function whenLabel(iso) {
 function renderCalendar(cal) {
   const el = $('up-next');
   if (!el) return;
-  const evs = (cal && cal.events) ? cal.events.slice(0, 3) : [];
-  if (!evs.length) { el.innerHTML = ''; return; }
+  const evs = (cal && cal.events) ? cal.events.slice(0, 4) : [];
+  const sub = $('n-sub');
+  if (sub) sub.textContent = evs.length ? 'from your calendar' : '';
+  if (!evs.length) {
+    el.innerHTML = '<li><span class="what muted">nothing on the calendar. the planner is the real one.</span></li>';
+    return;
+  }
   el.innerHTML = evs.map(e =>
     `<li><span class="when">${whenLabel(e.start)}</span><span class="what">${e.summary}</span></li>`
   ).join('');
@@ -685,6 +860,7 @@ async function pull() {
     render(d);
     renderCalendar(await calendar_());
     renderBrief(await brief_());
+    renderForecast(await forecast_());
   } catch (e) {
     $('az-line').textContent = 'collector has not run yet';
   }

@@ -13,68 +13,37 @@
 
   <div class="brief" id="brief" hidden></div>
 
-  <!-- the map owns the whole left edge: a map squeezed into a card is a thumbnail -->
+  <!-- time and weather own the whole top edge -->
+  <section class="panel topbar" id="p-today">
+    <div class="tb-clock">
+      <div class="clock" id="clock">--:--</div>
+      <div class="date" id="date">&nbsp;</div>
+    </div>
+    <div class="wx" id="wx">
+      <span class="wx-temp">&mdash;</span><span class="wx-desc">loading weather</span>
+    </div>
+    <div class="forecast" id="forecast"></div>
+    <div class="tb-tail">
+      <div class="verdict" id="verdict"></div>
+      <div class="sunline" id="sunline"></div>
+    </div>
+  </section>
+
+  <!-- the map, with more than one thing to look at -->
   <section class="panel where" id="p-where">
     <header><h2>you are here</h2><span class="sub" id="w-when"></span></header>
     <div class="where-place" id="w-place">&mdash;</div>
     <div class="where-meta" id="w-meta"></div>
     <div id="live-map"></div>
+    <div class="places" id="w-places"></div>
+    <div class="mapdots" id="map-dots"></div>
   </section>
 
-  <section class="panel today" id="p-today">
-    <div class="clock" id="clock">--:--</div>
-    <div class="date" id="date">&nbsp;</div>
-    <div class="wx" id="wx">
-      <span class="wx-temp">&mdash;</span><span class="wx-desc">loading weather</span>
-    </div>
-    <div class="verdict" id="verdict"></div>
-    <div class="sunline" id="sunline"></div>
+  <section class="panel next" id="p-next">
+    <header><h2>next up</h2><span class="sub" id="n-sub"></span></header>
     <ul class="upnext" id="up-next"></ul>
   </section>
 
-  <!-- one card for everything with a number in it: the box, the traffic, the money, the tokens -->
-  <section class="panel sys" id="p-sys">
-    <header>
-      <h2>systems and money</h2>
-      <span class="sub" id="l-up"></span>
-      <span class="sub" id="c-sub2"></span>
-    </header>
-    <div class="syswrap">
-
-      <div class="syscol">
-        <h3>the box</h3>
-        <div class="meter"><label>cpu</label><div class="bar"><i id="s-cpu"></i></div><span id="s-cpulbl">&mdash;</span></div>
-        <div class="meter"><label>mem</label><div class="bar"><i id="s-mem"></i></div><span id="s-memlbl"></span></div>
-        <div class="meter"><label>disk</label><div class="bar"><i id="s-disk"></i></div><span id="s-disklbl"></span></div>
-        <div class="stats4">
-          <div><b id="s-docker">0/0</b><small>containers</small></div>
-          <div><b id="s-temp">&mdash;</b><small>cpu &deg;C</small></div>
-          <div><b id="t-today">0</b><small>hits today</small></div>
-          <div><b id="t-e5" class="bad">0</b><small>5xx</small></div>
-        </div>
-        <div class="chart" id="t-chart"></div>
-        <ul class="paths" id="l-paths"></ul>
-      </div>
-
-      <div class="syscol">
-        <h3>what it costs</h3>
-        <div class="costhero">
-          <div class="herobig"><b id="m-days">&mdash;</b><small>days of runway</small></div>
-          <div class="costpct"><b id="m-lbl">&mdash;</b><small>to fund</small></div>
-        </div>
-        <div class="meter"><label>fund</label><div class="bar"><i id="m-bar"></i></div><span id="m-gap"></span></div>
-        <div class="chart tall" id="k-chart"></div>
-        <div class="row2 tight">
-          <div><b id="k-cost">$0</b><small>azuna today</small></div>
-          <div><b id="k-calls">0</b><small>calls</small></div>
-          <div><b id="m-months">&mdash;</b><small>to goal</small></div>
-        </div>
-      </div>
-
-    </div>
-  </section>
-
-  <!-- the report card: streaks on top, grades underneath -->
   <section class="panel report" id="p-report">
     <header><h2>report card</h2><span class="sub" id="r-sub"></span></header>
     <div class="streaks" id="r-streaks"></div>
@@ -87,14 +56,52 @@
     <div class="dots" id="dots"></div>
   </section>
 
-  <section class="panel azuna" id="p-azuna">
-    <span class="az-mark" id="az-mark"></span>
-    <span class="az-body">
-      <span class="az-top"><span class="sig">azuna</span><span class="mood calm" id="az-mood">all quiet</span></span>
-      <span id="az-line">hello</span>
-    </span>
-    <span class="stamp" id="az-stamp"></span>
-    <span class="az-grain" aria-hidden="true"></span>
+  <!-- the box on its own, small -->
+  <section class="panel sys" id="p-sys">
+    <header><h2>the box</h2><span class="sub" id="l-up"></span></header>
+    <div class="meter"><label>cpu</label><div class="bar"><i id="s-cpu"></i></div><span id="s-cpulbl">&mdash;</span></div>
+    <div class="meter"><label>mem</label><div class="bar"><i id="s-mem"></i></div><span id="s-memlbl"></span></div>
+    <div class="meter"><label>disk</label><div class="bar"><i id="s-disk"></i></div><span id="s-disklbl"></span></div>
+    <div class="stats4">
+      <div><b id="s-docker">0/0</b><small>containers</small></div>
+      <div><b id="s-temp">&mdash;</b><small>cpu &deg;C</small></div>
+      <div><b id="t-today">0</b><small>hits today</small></div>
+      <div><b id="t-e5" class="bad">0</b><small>5xx</small></div>
+    </div>
+    <div class="chart" id="t-chart"></div>
+    <ul class="paths" id="l-paths"></ul>
+  </section>
+
+  <!-- money, tokens, and azuna's own state, in one card -->
+  <section class="panel costs" id="p-cost">
+    <header><h2>money and spend</h2><span class="sub" id="c-sub2"></span></header>
+    <div class="costwrap">
+      <div class="costcol">
+        <div class="costhero">
+          <div class="herobig"><b id="m-days">&mdash;</b><small>days of runway</small></div>
+          <div class="costpct"><b id="m-lbl">&mdash;</b><small>to fund</small></div>
+        </div>
+        <div class="meter"><label>fund</label><div class="bar"><i id="m-bar"></i></div><span id="m-gap"></span></div>
+      </div>
+      <div class="costcol">
+        <div class="chart tall" id="k-chart"></div>
+        <div class="row2 tight">
+          <div><b id="k-cost">$0</b><small>azuna today</small></div>
+          <div><b id="k-calls">0</b><small>calls</small></div>
+          <div><b id="m-months">&mdash;</b><small>to goal</small></div>
+        </div>
+      </div>
+    </div>
+
+    <div class="azuna" id="p-azuna">
+      <span class="az-mark" id="az-mark"></span>
+      <span class="az-body">
+        <span class="az-top"><span class="sig">azuna</span><span class="mood calm" id="az-mood">all quiet</span></span>
+        <span id="az-line">hello</span>
+      </span>
+      <span class="stamp" id="az-stamp"></span>
+      <span class="az-grain" aria-hidden="true"></span>
+    </div>
   </section>
 
 </div>
