@@ -13,6 +13,14 @@
 
   <div class="brief" id="brief" hidden></div>
 
+  <!-- the map owns the whole left edge: a map squeezed into a card is a thumbnail -->
+  <section class="panel where" id="p-where">
+    <header><h2>you are here</h2><span class="sub" id="w-when"></span></header>
+    <div class="where-place" id="w-place">&mdash;</div>
+    <div class="where-meta" id="w-meta"></div>
+    <div id="live-map"></div>
+  </section>
+
   <section class="panel today" id="p-today">
     <div class="clock" id="clock">--:--</div>
     <div class="date" id="date">&nbsp;</div>
@@ -24,47 +32,45 @@
     <ul class="upnext" id="up-next"></ul>
   </section>
 
-  <!-- server and traffic, merged: both answer "is the box okay" -->
-  <section class="panel lab" id="p-lab">
-    <header><h2>server and traffic</h2><span class="sub" id="l-up"></span></header>
-    <div class="labrow">
-      <div class="labmeters">
+  <!-- one card for everything with a number in it: the box, the traffic, the money, the tokens -->
+  <section class="panel sys" id="p-sys">
+    <header>
+      <h2>systems and money</h2>
+      <span class="sub" id="l-up"></span>
+      <span class="sub" id="c-sub2"></span>
+    </header>
+    <div class="syswrap">
+
+      <div class="syscol">
+        <h3>the box</h3>
         <div class="meter"><label>cpu</label><div class="bar"><i id="s-cpu"></i></div><span id="s-cpulbl">&mdash;</span></div>
         <div class="meter"><label>mem</label><div class="bar"><i id="s-mem"></i></div><span id="s-memlbl"></span></div>
         <div class="meter"><label>disk</label><div class="bar"><i id="s-disk"></i></div><span id="s-disklbl"></span></div>
+        <div class="stats4">
+          <div><b id="s-docker">0/0</b><small>containers</small></div>
+          <div><b id="s-temp">&mdash;</b><small>cpu &deg;C</small></div>
+          <div><b id="t-today">0</b><small>hits today</small></div>
+          <div><b id="t-e5" class="bad">0</b><small>5xx</small></div>
+        </div>
+        <div class="chart" id="t-chart"></div>
+        <ul class="paths" id="l-paths"></ul>
       </div>
-      <div class="labstats">
-        <div><b id="s-docker">0/0</b><small>containers</small></div>
-        <div><b id="s-temp">&mdash;</b><small>cpu &deg;C</small></div>
-        <div><b id="t-today">0</b><small>hits today</small></div>
-        <div><b id="t-e5" class="bad">0</b><small>5xx</small></div>
+
+      <div class="syscol">
+        <h3>what it costs</h3>
+        <div class="costhero">
+          <div class="herobig"><b id="m-days">&mdash;</b><small>days of runway</small></div>
+          <div class="costpct"><b id="m-lbl">&mdash;</b><small>to fund</small></div>
+        </div>
+        <div class="meter"><label>fund</label><div class="bar"><i id="m-bar"></i></div><span id="m-gap"></span></div>
+        <div class="chart tall" id="k-chart"></div>
+        <div class="row2 tight">
+          <div><b id="k-cost">$0</b><small>azuna today</small></div>
+          <div><b id="k-calls">0</b><small>calls</small></div>
+          <div><b id="m-months">&mdash;</b><small>to goal</small></div>
+        </div>
       </div>
-    </div>
-    <div class="chart" id="t-chart"></div>
-    <ul class="paths" id="l-paths"></ul>
-  </section>
 
-  <!-- location gets its own card: a map is wasted as a carousel slide -->
-  <section class="panel where" id="p-where">
-    <header><h2>you are here</h2><span class="sub" id="w-when"></span></header>
-    <div class="where-place" id="w-place">&mdash;</div>
-    <div class="where-meta" id="w-meta"></div>
-    <div id="live-map"></div>
-  </section>
-
-  <!-- money and tokens, merged: both are "what this costs me" -->
-  <section class="panel cost" id="p-cost">
-    <header><h2>money and spend</h2><span class="sub" id="c-sub2"></span></header>
-    <div class="costhero">
-      <div><b id="m-days">&mdash;</b><small>days of runway</small></div>
-      <div class="costpct"><b id="m-lbl">&mdash;</b><small>to fund</small></div>
-    </div>
-    <div class="meter"><label>fund</label><div class="bar"><i id="m-bar"></i></div><span id="m-gap"></span></div>
-    <div class="chart tall" id="k-chart"></div>
-    <div class="row2 tight">
-      <div><b id="k-cost">$0</b><small>azuna today</small></div>
-      <div><b id="k-calls">0</b><small>calls</small></div>
-      <div><b id="m-months">&mdash;</b><small>to goal</small></div>
     </div>
   </section>
 
